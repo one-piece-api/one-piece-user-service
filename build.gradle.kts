@@ -2,6 +2,8 @@ plugins {
 	java
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("io.spring.javaformat") version "0.0.48"
+	checkstyle
 }
 
 group = "dev.onepieceapi"
@@ -38,4 +40,8 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+checkstyle {
+	toolVersion = "14.0.0"
 }

@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+		"-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+		"https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+	<!-- Spring Boot entry point: a public no-arg constructor is the standard,
+	     Spring Initializr-generated shape; SpringApplication.run never
+	     instantiates it directly, but it is not a "utility class" either. -->
+	<suppress checks="HideUtilityClassConstructor" files="[A-Za-z0-9]+Application\.java$"/>
+</suppressions>
