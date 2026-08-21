@@ -13,8 +13,8 @@ import java.util.regex.Pattern;
 
 /**
  * A validated request's identity, resolved past the raw token to the application's own
- * {@link ApplicationUser} record (see UF-IDU-10) — the authority a controller consults for
- * "who is calling", alongside the current roles carried by the token itself.
+ * {@link ApplicationUser} record (see UF-IDU-10) — the authority a controller consults
+ * for "who is calling", alongside the current roles carried by the token itself.
  */
 public class ApplicationUserAuthenticationToken extends AbstractAuthenticationToken {
 

@@ -19,7 +19,8 @@ import java.util.UUID;
  * on it directly — it consumes the {@link ApplicationUser} domain record instead,
  * obtained via {@code ApplicationUserService} ({@code ApplicationUserMapper} does the
  * conversion). Credentials, TOTP, roles, account status and email verification live only
- * in Keycloak and are deliberately not mirrored here — see {@link ApplicationUser} for why.
+ * in Keycloak and are deliberately not mirrored here — see {@link ApplicationUser} for
+ * why.
  */
 @Getter
 @Entity

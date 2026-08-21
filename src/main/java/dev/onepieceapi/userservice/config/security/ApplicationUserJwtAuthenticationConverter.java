@@ -18,18 +18,18 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Resolves a validated JWT to the corresponding {@link ApplicationUser} record and rejects
- * the request if the token does not resolve to exactly one known application user
+ * Resolves a validated JWT to the corresponding {@link ApplicationUser} record and
+ * rejects the request if the token does not resolve to exactly one known application user
  * (UF-IDU-10). Account status is not checked here: Keycloak is the sole owner of it (see
  * {@link ApplicationUser}), so a revocation (UF-IDU-13) takes effect at the identity
  * provider immediately but only reaches an already-issued access token once that token's
- * own short lifetime expires and refresh fails — an accepted, bounded window, not a local
+ * own short lifetime expires and refresh fails: an accepted, bounded window, not a local
  * per-request check.
  * <p>
  * Roles are read from the token's own {@code realm_access.roles} claim: Keycloak
- * recomputes that claim on every token issuance, including the silent refresh oauth2-proxy
- * already performs, so a role change (UF-IDU-15) reaches authorization on the next refresh
- * without needing a local mirror or forcing the user to log out.
+ * recomputes that claim on every token issuance, including the silent refresh
+ * oauth2-proxy already performs, so a role change (UF-IDU-15) reaches authorization on
+ * the next refresh without needing a local mirror or forcing the user to log out.
  */
 @Component
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
