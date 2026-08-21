@@ -89,6 +89,12 @@ jobs:
         with:
           context: .
           push: true
+          # Senza questo, buildx pubblica anche un manifest di provenance
+          # untagged accanto all'immagine: il job cleanup-untagged sotto lo
+          # cancella (ha tags == [], come ogni versione davvero orfana), ma
+          # quel manifest è referenziato dall'indice a cui punta ":latest",
+          # che quindi smette di essere pull-abile ("manifest not found").
+          provenance: false
           tags: |
             ghcr.io/one-piece-api/user-service:${{ steps.version.outputs.version }}
             ghcr.io/one-piece-api/user-service:latest
