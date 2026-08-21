@@ -1,6 +1,5 @@
 package dev.onepieceapi.userservice.config.security;
 
-import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.ApplicationUser;
 import dev.onepieceapi.userservice.exception.ApplicationUserNotFoundException;
 import dev.onepieceapi.userservice.service.ApplicationUserService;
@@ -39,7 +38,7 @@ class ApplicationUserJwtAuthenticationConverterTest {
 
 	@Test
 	void resolvesAuthoritiesFromTheTokensRealmRoles() {
-		ApplicationUser user = new ApplicationUser(USER_ID, "luffy@onepiece.local", AccountStatus.ACTIVE);
+		ApplicationUser user = new ApplicationUser(USER_ID, "luffy@onepiece.local");
 		when(this.applicationUserService.findByUserId(USER_ID)).thenReturn(user);
 
 		var authentication = this.converter.convert(jwtWithUserIdAndRoles(USER_ID, "ADMIN", "EDITOR"));
@@ -47,15 +46,6 @@ class ApplicationUserJwtAuthenticationConverterTest {
 		assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
 			.containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_EDITOR");
 		assertThat(((ApplicationUserAuthenticationToken) authentication).getApplicationUser()).isEqualTo(user);
-	}
-
-	@Test
-	void rejectsATokenForADisabledUser() {
-		ApplicationUser user = new ApplicationUser(USER_ID, "luffy@onepiece.local", AccountStatus.DISABLED);
-		when(this.applicationUserService.findByUserId(USER_ID)).thenReturn(user);
-
-		assertThatThrownBy(() -> this.converter.convert(jwtWithUserIdAndRoles(USER_ID, "ADMIN")))
-			.isInstanceOf(InvalidBearerTokenException.class);
 	}
 
 	@Test

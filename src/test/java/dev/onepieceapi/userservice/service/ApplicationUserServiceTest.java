@@ -1,6 +1,5 @@
 package dev.onepieceapi.userservice.service;
 
-import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.ApplicationUser;
 import dev.onepieceapi.userservice.exception.ApplicationUserNotFoundException;
 import dev.onepieceapi.userservice.persistence.ApplicationUserRepository;
@@ -37,12 +36,12 @@ class ApplicationUserServiceTest {
 
 	@Test
 	void mapsThePersistedEntityToTheDomainRecord() {
-		var entity = new ApplicationUserEntity(USER_ID, EMAIL, AccountStatus.ACTIVE);
+		var entity = new ApplicationUserEntity(USER_ID, EMAIL);
 		when(this.applicationUserRepository.findById(USER_ID)).thenReturn(Optional.of(entity));
 
 		ApplicationUser applicationUser = this.applicationUserService.findByUserId(USER_ID);
 
-		assertThat(applicationUser).isEqualTo(new ApplicationUser(USER_ID, EMAIL, AccountStatus.ACTIVE));
+		assertThat(applicationUser).isEqualTo(new ApplicationUser(USER_ID, EMAIL));
 	}
 
 	@Test

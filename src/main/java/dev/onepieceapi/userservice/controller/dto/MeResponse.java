@@ -3,10 +3,10 @@ package dev.onepieceapi.userservice.controller.dto;
 import java.util.List;
 
 /**
- * The caller's identity as the application currently records it: status and roles come
- * from the application user record (see Step 2 of the implementation plan), not raw token
- * claims.
+ * The caller's identity as the application currently resolves it: email from the
+ * application user record, roles from the token's current claims (see Step 2 of the
+ * implementation plan).
  */
-public record MeResponse(String email, String status, List<String> roles) {
+public record MeResponse(String email, List<String> roles) {
 
 }

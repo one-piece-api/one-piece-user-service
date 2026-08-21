@@ -8,7 +8,7 @@ import lombok.experimental.UtilityClass;
 public class ApplicationUserMapper {
 
 	public ApplicationUser from(ApplicationUserEntity entity) {
-		return new ApplicationUser(entity.getUserId(), entity.getEmail(), entity.getStatus());
+		return new ApplicationUser(entity.getUserId(), entity.getEmail());
 	}
 
 }

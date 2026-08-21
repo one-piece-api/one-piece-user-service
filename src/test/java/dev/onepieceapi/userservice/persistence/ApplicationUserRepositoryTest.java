@@ -1,6 +1,5 @@
 package dev.onepieceapi.userservice.persistence;
 
-import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.persistence.entity.ApplicationUserEntity;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,23 +35,21 @@ class ApplicationUserRepositoryTest {
 	private ApplicationUserRepository applicationUserRepository;
 
 	@Test
-	void theBootstrapAdminSeededByFlywayIsPersistedAndActive() {
+	void theBootstrapAdminSeededByFlywayIsPersisted() {
 		UUID bootstrapUserId = UUID.fromString("446fbe79-5cc4-458d-925d-9934334b6dcf");
 
 		Optional<ApplicationUserEntity> luffy = this.applicationUserRepository.findById(bootstrapUserId);
 
 		assertThat(luffy).isPresent();
 		assertThat(luffy.get().getEmail()).isEqualTo("luffy@onepiece.local");
-		assertThat(luffy.get().getStatus()).isEqualTo(AccountStatus.ACTIVE);
 	}
 
 	@Test
 	void persistsAUserRecordingCreationAndUpdateTimestamps() {
-		var user = new ApplicationUserEntity(UUID.randomUUID(), "nami@onepiece.local", AccountStatus.PENDING);
+		var user = new ApplicationUserEntity(UUID.randomUUID(), "nami@onepiece.local");
 
 		ApplicationUserEntity saved = this.applicationUserRepository.saveAndFlush(user);
 
-		assertThat(saved.getStatus()).isEqualTo(AccountStatus.PENDING);
 		assertThat(saved.getCreatedAt()).isNotNull();
 		assertThat(saved.getUpdatedAt()).isNotNull();
 	}
@@ -60,8 +57,8 @@ class ApplicationUserRepositoryTest {
 	@Test
 	void rejectsADuplicateEmail() {
 		String email = "zoro@onepiece.local";
-		var first = new ApplicationUserEntity(UUID.randomUUID(), email, AccountStatus.ACTIVE);
-		var second = new ApplicationUserEntity(UUID.randomUUID(), email, AccountStatus.PENDING);
+		var first = new ApplicationUserEntity(UUID.randomUUID(), email);
+		var second = new ApplicationUserEntity(UUID.randomUUID(), email);
 		this.applicationUserRepository.saveAndFlush(first);
 
 		assertThatThrownBy(() -> this.applicationUserRepository.saveAndFlush(second))

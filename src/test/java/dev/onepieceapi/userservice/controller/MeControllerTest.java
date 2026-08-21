@@ -1,7 +1,6 @@
 package dev.onepieceapi.userservice.controller;
 
 import dev.onepieceapi.userservice.config.security.ApplicationUserAuthenticationToken;
-import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.ApplicationUser;
 import dev.onepieceapi.userservice.service.ApplicationUserService;
 import org.junit.jupiter.api.Test;
@@ -31,8 +30,8 @@ class MeControllerTest {
 	private ApplicationUserService applicationUserService;
 
 	@Test
-	void returnsEmailStatusAndRolesFromTheTokensRealmRoles() throws Exception {
-		var luffy = new ApplicationUser(UUID.randomUUID(), "luffy@onepiece.local", AccountStatus.ACTIVE);
+	void returnsEmailAndRolesFromTheTokensRealmRoles() throws Exception {
+		var luffy = new ApplicationUser(UUID.randomUUID(), "luffy@onepiece.local");
 		var jwt = Jwt.withTokenValue("token")
 			.header("alg", "none")
 			.issuedAt(Instant.EPOCH)
@@ -44,7 +43,7 @@ class MeControllerTest {
 		var asLuffy = authentication(new ApplicationUserAuthenticationToken(jwt, luffy, authorities));
 
 		this.mockMvc.perform(get("/me").with(asLuffy)).andExpect(status().isOk()).andExpect(content().json("""
-				{"email": "luffy@onepiece.local", "status": "ACTIVE", "roles": ["ADMIN", "EDITOR"]}
+				{"email": "luffy@onepiece.local", "roles": ["ADMIN", "EDITOR"]}
 				"""));
 	}
 

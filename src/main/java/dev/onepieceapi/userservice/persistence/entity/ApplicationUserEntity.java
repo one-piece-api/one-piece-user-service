@@ -1,11 +1,8 @@
 package dev.onepieceapi.userservice.persistence.entity;
 
-import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.ApplicationUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -21,8 +18,8 @@ import java.util.UUID;
  * outside the {@code persistence} packages, application/business code should never depend
  * on it directly — it consumes the {@link ApplicationUser} domain record instead,
  * obtained via {@code ApplicationUserService} ({@code ApplicationUserMapper} does the
- * conversion). Credentials and TOTP live only in Keycloak; roles are deliberately not
- * mirrored here — see {@link ApplicationUser} for why.
+ * conversion). Credentials, TOTP, roles, account status and email verification live only
+ * in Keycloak and are deliberately not mirrored here — see {@link ApplicationUser} for why.
  */
 @Getter
 @Entity
@@ -36,10 +33,6 @@ public class ApplicationUserEntity {
 	@Column(nullable = false, unique = true)
 	private String email;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false)
-	private AccountStatus status;
-
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
@@ -51,10 +44,9 @@ public class ApplicationUserEntity {
 	protected ApplicationUserEntity() {
 	}
 
-	public ApplicationUserEntity(UUID userId, String email, AccountStatus status) {
+	public ApplicationUserEntity(UUID userId, String email) {
 		this.userId = userId;
 		this.email = email;
-		this.status = status;
 	}
 
 }

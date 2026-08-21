@@ -1,6 +1,5 @@
 package dev.onepieceapi.userservice.config.security;
 
-import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.ApplicationUser;
 import dev.onepieceapi.userservice.exception.ApplicationUserNotFoundException;
 import dev.onepieceapi.userservice.service.ApplicationUserService;
@@ -19,16 +18,18 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Resolves a validated JWT to the corresponding {@link ApplicationUser} record and
- * rejects the request if the token does not resolve to exactly one known,
- * non-{@code DISABLED} user (UF-IDU-10) — status is authoritative from the application
- * record, not the token, so a revocation blocks even an already-issued, still-valid token
- * on the very next request.
+ * Resolves a validated JWT to the corresponding {@link ApplicationUser} record and rejects
+ * the request if the token does not resolve to exactly one known application user
+ * (UF-IDU-10). Account status is not checked here: Keycloak is the sole owner of it (see
+ * {@link ApplicationUser}), so a revocation (UF-IDU-13) takes effect at the identity
+ * provider immediately but only reaches an already-issued access token once that token's
+ * own short lifetime expires and refresh fails — an accepted, bounded window, not a local
+ * per-request check.
  * <p>
- * Roles, by contrast, are read from the token's own {@code realm_access.roles} claim:
- * Keycloak recomputes that claim on every token issuance, including the silent refresh
- * oauth2-proxy already performs, so a role change (UF-IDU-15) reaches authorization on
- * the next refresh without needing a local mirror or forcing the user to log out.
+ * Roles are read from the token's own {@code realm_access.roles} claim: Keycloak
+ * recomputes that claim on every token issuance, including the silent refresh oauth2-proxy
+ * already performs, so a role change (UF-IDU-15) reaches authorization on the next refresh
+ * without needing a local mirror or forcing the user to log out.
  */
 @Component
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -50,17 +51,12 @@ class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, Abstra
 	}
 
 	private ApplicationUser resolveApplicationUser(UUID userId) {
-		ApplicationUser applicationUser;
 		try {
-			applicationUser = this.applicationUserService.findByUserId(userId);
+			return this.applicationUserService.findByUserId(userId);
 		}
 		catch (ApplicationUserNotFoundException ex) {
 			throw new InvalidBearerTokenException("Token does not resolve to a known user", ex);
 		}
-		if (applicationUser.status() == AccountStatus.DISABLED) {
-			throw new InvalidBearerTokenException("Application user is disabled");
-		}
-		return applicationUser;
 	}
 
 	private static UUID resolveUserId(Jwt jwt) {

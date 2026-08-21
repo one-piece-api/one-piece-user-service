@@ -3,16 +3,16 @@
 -- (never by Postgres) and is the canonical identifier referenced by the matching
 -- Keycloak account, so it is not a generated/serial column here.
 --
--- Roles are deliberately not modeled here: Keycloak recomputes realm_access.roles on every
--- token issuance (including silent refresh), so authorization reads roles from the token
--- rather than a local mirror. Only account status needs a local, per-request check, since a
--- revocation must block an already-issued, still-valid token immediately (UF-IDU-13).
+-- Roles, account status and email verification are deliberately not modeled here either:
+-- Keycloak is the sole owner of all three (recomputing realm_access.roles on every token
+-- issuance, including silent refresh, and holding enabled/emailVerified natively), so
+-- authorization reads them from the token / the identity provider rather than a local
+-- mirror that could drift out of sync.
 
 CREATE TABLE application_user
 (
     user_id    UUID PRIMARY KEY,
     email      VARCHAR(255) NOT NULL,
-    status     VARCHAR(20)  NOT NULL,
     created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT uq_application_user_email UNIQUE (email)

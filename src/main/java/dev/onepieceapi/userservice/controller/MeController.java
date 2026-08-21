@@ -12,7 +12,7 @@ class MeController {
 	@GetMapping("/me")
 	MeResponse me(ApplicationUserAuthenticationToken authentication) {
 		ApplicationUser applicationUser = authentication.getApplicationUser();
-		return new MeResponse(applicationUser.email(), applicationUser.statusName(), authentication.getRoles());
+		return new MeResponse(applicationUser.email(), authentication.getRoles());
 	}
 
 }
