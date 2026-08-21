@@ -1,5 +1,7 @@
-package dev.onepieceapi.userservice.config;
+package dev.onepieceapi.userservice.config.security;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,10 +14,13 @@ import org.springframework.security.web.SecurityFilterChain;
  * Every request is authenticated against Keycloak (realm "onepiece") as a JWT-based
  * OAuth2 resource server, except the Kubernetes health probes. Beyond
  * signature/expiry/issuer validation, {@link ApplicationUserJwtAuthenticationConverter}
- * resolves the token to the application's own user record and builds authorities from its
- * *current* roles (UF-IDU-10) — not from the token's own "realm_access.roles" claim.
+ * resolves the token to the application's own user record to enforce status (UF-IDU-10),
+ * rejecting a DISABLED user even with an otherwise still-valid token, while authorities
+ * are built from the token's own "realm_access.roles" claim, which Keycloak recomputes on
+ * every issuance.
  */
 @Configuration
+@RequiredArgsConstructor(onConstructor_ = { @Autowired })
 public class SecurityConfig {
 
 	/**
@@ -27,10 +32,6 @@ public class SecurityConfig {
 	private static final String HEALTH_PROBE_PATH = "/actuator/health/**";
 
 	private final ApplicationUserJwtAuthenticationConverter jwtAuthenticationConverter;
-
-	SecurityConfig(ApplicationUserJwtAuthenticationConverter jwtAuthenticationConverter) {
-		this.jwtAuthenticationConverter = jwtAuthenticationConverter;
-	}
 
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http) {

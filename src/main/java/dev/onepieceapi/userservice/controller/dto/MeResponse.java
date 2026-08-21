@@ -1,4 +1,4 @@
-package dev.onepieceapi.userservice.dto;
+package dev.onepieceapi.userservice.controller.dto;
 
 import java.util.List;
 
