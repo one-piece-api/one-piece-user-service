@@ -50,6 +50,19 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-validation-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+	// RestTestClient (Boot 4/Spring Framework 7's replacement for the
+	// soon-to-be-deprecated TestRestTemplate) for AdminUserListingIntegrationTest's
+	// real-server HTTP calls.
+	testImplementation("org.springframework.boot:spring-boot-resttestclient")
+	// Spins up a real Keycloak (Testcontainers) for AdminUserListingIntegrationTest,
+	// instead of mocking the Admin REST API - exercises the real security filter chain
+	// and KeycloakClient wiring together. Pinned to the 3.7.x line (Testcontainers
+	// 1.20.6) to match the Testcontainers version Spring Boot 4.1 itself manages
+	// (1.20.4) - the newer 4.x line requires Testcontainers 2.x, which Boot 4.1 does
+	// not yet manage, and mixing major Testcontainers versions risks class/method
+	// mismatches at runtime.
+	testImplementation("com.github.dasniko:testcontainers-keycloak:3.7.0")
+	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

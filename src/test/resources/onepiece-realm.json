@@ -1,0 +1,62 @@
+{
+  "realm": "onepiece",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "ADMIN", "description": "Full administrative access" },
+      { "name": "EDITOR", "description": "Content editing permissions" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "test-client",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"]
+    },
+    {
+      "clientId": "user-service-admin",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "test-admin-client-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-user-service-admin",
+      "enabled": true,
+      "serviceAccountClientId": "user-service-admin",
+      "clientRoles": {
+        "realm-management": ["view-users", "query-users"]
+      }
+    },
+    {
+      "username": "luffy",
+      "email": "luffy@onepiece.local",
+      "firstName": "Monkey D.",
+      "lastName": "Luffy",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "luffy-pass", "temporary": false }
+      ],
+      "realmRoles": ["ADMIN"]
+    },
+    {
+      "username": "nami",
+      "email": "nami@onepiece.local",
+      "firstName": "Nami",
+      "lastName": "Cat Burglar",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "nami-pass", "temporary": false }
+      ],
+      "realmRoles": ["EDITOR"]
+    }
+  ]
+}
