@@ -21,6 +21,13 @@ import java.util.function.Supplier;
 @Slf4j
 public class KeycloakClient {
 
+	/**
+	 * Every realm has an auto-created composite role named this way, directly assigned to
+	 * every account by Keycloak itself - not a "product role" an ADMIN ever assigns, so
+	 * it is filtered out of {@link #fetchRoles}.
+	 */
+	private static final String DEFAULT_ROLE_PREFIX = "default-roles-";
+
 	private final Keycloak keycloakAdminClient;
 
 	private final ExecutorService keycloakAdminExecutor;
@@ -58,6 +65,7 @@ public class KeycloakClient {
 			.listAll()
 			.stream()
 			.map(RoleRepresentation::getName)
+			.filter(name -> !name.startsWith(DEFAULT_ROLE_PREFIX))
 			.toList();
 	}
 

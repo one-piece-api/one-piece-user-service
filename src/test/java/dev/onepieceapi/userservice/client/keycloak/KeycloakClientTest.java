@@ -81,6 +81,18 @@ class KeycloakClientTest {
 	}
 
 	@Test
+	void filtersOutTheAutoAssignedDefaultRealmRole() {
+		UserRepresentation luffy = userWithId(LUFFY_ID);
+		when(this.usersResource.list(0, 10)).thenReturn(List.of(luffy));
+		mockRoles(LUFFY_ID, "ADMIN", "default-roles-onepiece");
+
+		List<UserRepresentation> users = this.keycloakClient.users(0, 10);
+
+		List<String> realmRoles = users.getFirst().getRealmRoles();
+		assertThat(realmRoles).containsExactly("ADMIN");
+	}
+
+	@Test
 	void countsTheRealmsTotalUsers() {
 		when(this.usersResource.count()).thenReturn(37);
 
