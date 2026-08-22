@@ -2,13 +2,11 @@ package dev.onepieceapi.userservice.controller;
 
 import dev.onepieceapi.userservice.config.security.ApplicationUserAuthenticationToken;
 import dev.onepieceapi.userservice.domain.ApplicationUser;
-import dev.onepieceapi.userservice.service.ApplicationUserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -25,9 +23,6 @@ class MeControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
-
-	@MockitoBean
-	private ApplicationUserService applicationUserService;
 
 	@Test
 	void returnsEmailAndRolesFromTheTokensRealmRoles() throws Exception {

@@ -31,6 +31,8 @@ public class SecurityConfig {
 
 	private static final String HEALTH_PROBE_PATH = "/actuator/health/**";
 
+	private static final String ADMIN_PATH = "/admin/**";
+
 	private final ApplicationUserJwtAuthenticationConverter jwtAuthenticationConverter;
 
 	@Bean
@@ -39,6 +41,7 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> {
 				auth.requestMatchers(HEALTH_PROBE_PATH).permitAll();
+				auth.requestMatchers(ADMIN_PATH).hasRole("ADMIN");
 				auth.anyRequest().authenticated();
 			})
 			.oauth2ResourceServer(oauth2 -> oauth2.jwt(this::configureJwt));

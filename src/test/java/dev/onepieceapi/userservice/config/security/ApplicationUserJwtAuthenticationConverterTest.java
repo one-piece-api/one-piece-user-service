@@ -1,13 +1,8 @@
 package dev.onepieceapi.userservice.config.security;
 
 import dev.onepieceapi.userservice.domain.ApplicationUser;
-import dev.onepieceapi.userservice.exception.ApplicationUserNotFoundException;
-import dev.onepieceapi.userservice.service.ApplicationUserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
@@ -19,54 +14,48 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class ApplicationUserJwtAuthenticationConverterTest {
 
 	private static final UUID USER_ID = UUID.fromString("446fbe79-5cc4-458d-925d-9934334b6dcf");
 
-	@Mock
-	private ApplicationUserService applicationUserService;
+	private static final String EMAIL = "luffy@onepiece.local";
 
 	private ApplicationUserJwtAuthenticationConverter converter;
 
 	@BeforeEach
 	void setUp() {
-		this.converter = new ApplicationUserJwtAuthenticationConverter(this.applicationUserService);
+		this.converter = new ApplicationUserJwtAuthenticationConverter();
 	}
 
 	@Test
-	void resolvesAuthoritiesFromTheTokensRealmRoles() {
-		ApplicationUser user = new ApplicationUser(USER_ID, "luffy@onepiece.local");
-		when(this.applicationUserService.findByUserId(USER_ID)).thenReturn(user);
-
-		var authentication = this.converter.convert(jwtWithUserIdAndRoles(USER_ID, "ADMIN", "EDITOR"));
+	void resolvesTheApplicationUserAndAuthoritiesFromTheTokensOwnClaims() {
+		Jwt jwt = jwtWithSubjectEmailAndRoles(USER_ID, EMAIL, "ADMIN", "EDITOR");
+		var authentication = this.converter.convert(jwt);
 
 		assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
 			.containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_EDITOR");
-		assertThat(((ApplicationUserAuthenticationToken) authentication).getApplicationUser()).isEqualTo(user);
+		assertThat(((ApplicationUserAuthenticationToken) authentication).getApplicationUser())
+			.isEqualTo(new ApplicationUser(USER_ID, EMAIL));
 	}
 
 	@Test
-	void rejectsATokenThatDoesNotResolveToAKnownUser() {
-		when(this.applicationUserService.findByUserId(USER_ID))
-			.thenThrow(new ApplicationUserNotFoundException(USER_ID));
-
-		assertThatThrownBy(() -> this.converter.convert(jwtWithUserIdAndRoles(USER_ID, "ADMIN")))
-			.isInstanceOf(InvalidBearerTokenException.class);
-	}
-
-	@Test
-	void rejectsATokenMissingTheUserIdClaim() {
-		Jwt jwt = jwtWithClaims(Map.of());
+	void rejectsATokenMissingTheSubjectClaim() {
+		Jwt jwt = jwtWithClaims(Map.of("email", EMAIL));
 
 		assertThatThrownBy(() -> this.converter.convert(jwt)).isInstanceOf(InvalidBearerTokenException.class);
 	}
 
-	private static Jwt jwtWithUserIdAndRoles(UUID userId, String... roles) {
+	@Test
+	void rejectsATokenMissingTheEmailClaim() {
+		Jwt jwt = jwtWithClaims(Map.of("sub", USER_ID.toString()));
+
+		assertThatThrownBy(() -> this.converter.convert(jwt)).isInstanceOf(InvalidBearerTokenException.class);
+	}
+
+	private static Jwt jwtWithSubjectEmailAndRoles(UUID userId, String email, String... roles) {
 		Map<String, Object> realmAccess = Map.of("roles", List.of(roles));
-		return jwtWithClaims(Map.of("userId", userId.toString(), "realm_access", realmAccess));
+		return jwtWithClaims(Map.of("sub", userId.toString(), "email", email, "realm_access", realmAccess));
 	}
 
 	private static Jwt jwtWithClaims(Map<String, Object> claims) {
