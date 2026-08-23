@@ -29,6 +29,13 @@ import java.util.function.Supplier;
 @Slf4j
 public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
+	/**
+	 * Every realm has an auto-created composite role named this way, directly assigned to
+	 * every account by Keycloak itself - not a "product role" an ADMIN ever assigns, so
+	 * it is filtered out of {@link #fetchRealmRoles}.
+	 */
+	private static final String DEFAULT_ROLE_PREFIX = "default-roles-";
+
 	private final Keycloak keycloakAdminClient;
 
 	private final ExecutorService keycloakAdminExecutor;
@@ -66,6 +73,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			.listAll()
 			.stream()
 			.map(RoleRepresentation::getName)
+			.filter(name -> !name.startsWith(DEFAULT_ROLE_PREFIX))
 			.toList();
 	}
 
