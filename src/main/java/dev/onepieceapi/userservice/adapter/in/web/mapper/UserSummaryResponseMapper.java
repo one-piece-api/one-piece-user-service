@@ -1,19 +1,19 @@
 package dev.onepieceapi.userservice.adapter.in.web.mapper;
 
 import dev.onepieceapi.userservice.adapter.in.web.dto.UserSummaryResponse;
-import dev.onepieceapi.userservice.domain.UserAccount;
+import dev.onepieceapi.userservice.domain.User;
 import lombok.experimental.UtilityClass;
 
 @UtilityClass
 public class UserSummaryResponseMapper {
 
-	public UserSummaryResponse toResponse(UserAccount account) {
+	public UserSummaryResponse toResponse(User user) {
 		return UserSummaryResponse.builder()
-			.userId(account.userId())
-			.email(account.email())
-			.status(account.status())
-			.roles(account.roles())
-			.createdAt(account.createdAt())
+			.userId(user.userId())
+			.email(user.email())
+			.status(user.status())
+			.roles(user.roles())
+			.createdAt(user.createdAt())
 			.build();
 	}
 

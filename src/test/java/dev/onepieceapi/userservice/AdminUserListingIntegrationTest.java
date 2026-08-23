@@ -1,10 +1,16 @@
 package dev.onepieceapi.userservice;
 
+import com.icegreen.greenmail.junit5.GreenMailExtension;
+import com.icegreen.greenmail.util.ServerSetup;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
+import jakarta.mail.Address;
+import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,26 +22,50 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Exercises the ADMIN user listing (UF-IDU-17) against a real Keycloak (Testcontainers),
- * not Mockito mocks: the full security filter chain (including the "sub"-based
- * {@code ApplicationUserJwtAuthenticationConverter} resolution and the "/admin/**" ->
- * hasRole("ADMIN") rule) and the real Admin REST API call chain in {@code KeycloakClient}
- * all run against a dedicated realm imported just for this test.
+ * Exercises the ADMIN user listing (UF-IDU-17) and invite endpoint (UF-IDU-01) against a
+ * real Keycloak (Testcontainers), not Mockito mocks: the full security filter chain
+ * (including the "sub"-based {@code ApplicationUserJwtAuthenticationConverter} resolution
+ * and the "/admin/**" -&gt; hasRole("ADMIN") rule) and the real Admin REST API call chain
+ * in {@code KeycloakUserDirectoryAdapter} all run against a dedicated realm imported just
+ * for this test. A real Postgres (Testcontainers) backs the audit log the invite endpoint
+ * writes to.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @Testcontainers
 class AdminUserListingIntegrationTest {
 
+	// The fake SMTP server's fixed port (see GREEN_MAIL below) - must be registered for
+	// container-network forwarding before KEYCLOAK starts, since the realm fixture's
+	// smtpServer.host ("host.testcontainers.internal") only resolves once it is.
+	static {
+		org.testcontainers.Testcontainers.exposeHostPorts(3025);
+	}
+
 	@Container
 	static final KeycloakContainer KEYCLOAK = new KeycloakContainer("quay.io/keycloak/keycloak:26.6.4")
 		.withRealmImportFile("onepiece-realm.json");
+
+	@Container
+	@ServiceConnection
+	static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18.6");
+
+	/**
+	 * Fake SMTP server the realm fixture's smtpServer block points at (see
+	 * onepiece-realm.json), so {@code anAdminCanInviteANewUser} can assert Keycloak
+	 * really sent the invitation email (UF-IDU-01) - production instead uses Resend, see
+	 * implementation-plan.md's Step 4 write-up.
+	 */
+	@RegisterExtension
+	static final GreenMailExtension GREEN_MAIL = new GreenMailExtension(
+			new ServerSetup(3025, null, ServerSetup.PROTOCOL_SMTP));
 
 	private static final String ADMIN_CLIENT_SECRET = "test-admin-client-secret";
 
@@ -72,6 +102,57 @@ class AdminUserListingIntegrationTest {
 		this.restTestClient.get()
 			.uri("/admin/users")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
+			.exchange()
+			.expectStatus()
+			.isForbidden();
+	}
+
+	@Test
+	void anAdminCanInviteANewUser() throws Exception {
+		this.restTestClient.post()
+			.uri("/admin/users")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"email": "usopp@onepiece.local", "roles": ["EDITOR"]}
+					""")
+			.exchange()
+			.expectStatus()
+			.isCreated()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("usopp@onepiece.local")
+				.contains("\"status\":\"PENDING\"")
+				.contains("\"EDITOR\""));
+
+		assertThat(GREEN_MAIL.waitForIncomingEmail(5000, 1)).isTrue();
+		MimeMessage invitationEmail = GREEN_MAIL.getReceivedMessages()[0];
+		Address[] recipients = invitationEmail.getAllRecipients();
+		assertThat(recipients).extracting(Object::toString).contains("usopp@onepiece.local");
+	}
+
+	@Test
+	void invitingAnAlreadyRegisteredEmailIsRejected() {
+		this.restTestClient.post()
+			.uri("/admin/users")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"email": "luffy@onepiece.local", "roles": ["ADMIN"]}
+					""")
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409);
+	}
+
+	@Test
+	void aNonAdminCannotInviteAUser() {
+		this.restTestClient.post()
+			.uri("/admin/users")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"email": "chopper@onepiece.local", "roles": ["EDITOR"]}
+					""")
 			.exchange()
 			.expectStatus()
 			.isForbidden();

@@ -26,8 +26,8 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	// Page/Pageable for the admin listing (UF-IDU-17) - DB-agnostic, pulled in
-	// directly rather than via a JPA starter since this service has no
-	// persistence of its own (Keycloak is the sole identity store, see §2 of
+	// directly rather than via the JPA starter below since Keycloak (not this
+	// service's own database) is what's actually paginated (see §2 of
 	// application-user-identity-management.md). Both are needed as of Boot
 	// 4.1's split autoconfigure modules: spring-data-commons for the
 	// Page/Pageable types themselves, spring-boot-data-commons for the
@@ -35,6 +35,13 @@ dependencies {
 	// request params (page/size/sort).
 	implementation("org.springframework.data:spring-data-commons")
 	implementation("org.springframework.boot:spring-boot-data-commons")
+	// The one thing this service does persist itself: the audit trail (§13,
+	// starting at Step 4/UF-IDU-01) - see docs/adr/0001-audit-log-persistence.md.
+	// Everything else stays Keycloak-derived, unchanged.
+	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	runtimeOnly("org.flywaydb:flyway-database-postgresql")
+	runtimeOnly("org.postgresql:postgresql")
 	// Versioned independently of the Keycloak server since it moved to its own
 	// repository (github.com/keycloak/keycloak-client) - NOT tied to the
 	// 26.6.4 server deployed by onepiece-infrastructure. 26.0.12 is the
@@ -50,6 +57,8 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-validation-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+	// DataJpaTest + AutoConfigureTestDatabase for JpaAuditLogAdapterTest.
+	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
 	// RestTestClient (Boot 4/Spring Framework 7's replacement for the
 	// soon-to-be-deprecated TestRestTemplate) for AdminUserListingIntegrationTest's
 	// real-server HTTP calls.
@@ -63,6 +72,17 @@ dependencies {
 	// mismatches at runtime.
 	testImplementation("com.github.dasniko:testcontainers-keycloak:3.7.0")
 	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+	// Real PostgreSQL (Testcontainers, @ServiceConnection) for JpaAuditLogAdapterTest -
+	// exercises the Flyway migration and JPA mapping against the real database engine,
+	// not an in-memory substitute. Version managed by Spring Boot's own BOM (unlike the
+	// third-party testcontainers-keycloak module above), so no explicit pin needed.
+	testImplementation("org.testcontainers:testcontainers-postgresql")
+	testImplementation("org.springframework.boot:spring-boot-testcontainers")
+	// A fake SMTP server for AdminUserListingIntegrationTest's invite scenario, so it can
+	// assert Keycloak actually sent the invitation email (UF-IDU-01) instead of stopping
+	// at "the Admin API call succeeded" - not managed by Spring Boot's BOM, latest stable
+	// pinned explicitly like the other third-party test-only dependencies above.
+	testImplementation("com.icegreen:greenmail-junit5:2.1.3")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

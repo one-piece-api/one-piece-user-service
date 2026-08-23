@@ -1,6 +1,14 @@
 {
   "realm": "onepiece",
   "enabled": true,
+  "smtpServer": {
+    "host": "host.testcontainers.internal",
+    "port": "3025",
+    "from": "test@onepiece.local",
+    "auth": "false",
+    "starttls": "false",
+    "ssl": "false"
+  },
   "roles": {
     "realm": [
       { "name": "ADMIN", "description": "Full administrative access" },
@@ -14,6 +22,14 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "redirectUris": ["*"]
+    },
+    {
+      "clientId": "onepiece-proxy",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "test-proxy-client-secret",
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:4180/*"]
     },
     {
       "clientId": "user-service-admin",
@@ -31,7 +47,7 @@
       "enabled": true,
       "serviceAccountClientId": "user-service-admin",
       "clientRoles": {
-        "realm-management": ["view-users", "query-users"]
+        "realm-management": ["view-realm", "view-users", "query-users", "manage-users"]
       }
     },
     {

@@ -1,7 +1,7 @@
 package dev.onepieceapi.userservice.adapter.out.keycloak;
 
 import dev.onepieceapi.userservice.domain.AccountStatus;
-import dev.onepieceapi.userservice.domain.UserAccount;
+import dev.onepieceapi.userservice.domain.User;
 import lombok.experimental.UtilityClass;
 import org.keycloak.representations.idm.UserRepresentation;
 
@@ -10,19 +10,18 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Maps Keycloak's own {@link UserRepresentation} to the domain {@link UserAccount},
- * including deriving {@link AccountStatus} from Keycloak-specific account state
- * ({@code enabled}, {@code requiredActions}) - knowledge that belongs to this adapter,
- * not to the domain.
+ * Maps Keycloak's own {@link UserRepresentation} to the domain {@link User}, including
+ * deriving {@link AccountStatus} from Keycloak-specific account state ({@code enabled},
+ * {@code requiredActions}) - knowledge that belongs to this adapter, not to the domain.
  */
 @UtilityClass
-class KeycloakUserAccountMapper {
+class KeycloakUserMapper {
 
 	private static final String UPDATE_PASSWORD_REQUIRED_ACTION = "UPDATE_PASSWORD";
 
-	UserAccount toUserAccount(UserRepresentation user, List<String> realmRoles) {
-		return new UserAccount(UUID.fromString(user.getId()), user.getEmail(), statusOf(user), realmRoles,
-				createdAtOf(user));
+	User toUser(UserRepresentation user, List<String> realmRoles) {
+		UUID userId = UUID.fromString(user.getId());
+		return new User(userId, user.getEmail(), statusOf(user), realmRoles, createdAtOf(user));
 	}
 
 	private AccountStatus statusOf(UserRepresentation user) {

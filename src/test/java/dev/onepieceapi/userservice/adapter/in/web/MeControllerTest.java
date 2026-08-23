@@ -1,7 +1,8 @@
 package dev.onepieceapi.userservice.adapter.in.web;
 
 import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthenticationToken;
-import dev.onepieceapi.userservice.domain.ApplicationUser;
+import dev.onepieceapi.userservice.domain.AccountStatus;
+import dev.onepieceapi.userservice.domain.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -10,6 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,7 +28,8 @@ class MeControllerTest {
 
 	@Test
 	void returnsEmailAndRolesFromTheTokensRealmRoles() throws Exception {
-		var luffy = new ApplicationUser(UUID.randomUUID(), "luffy@onepiece.local");
+		var roles = List.of("ADMIN", "EDITOR");
+		var luffy = new User(UUID.randomUUID(), "luffy@onepiece.local", AccountStatus.ACTIVE, roles, null);
 		var jwt = Jwt.withTokenValue("token")
 			.header("alg", "none")
 			.issuedAt(Instant.EPOCH)

@@ -17,7 +17,7 @@ import java.util.concurrent.Executors;
  * this pod's readiness to Keycloak's.
  */
 @Configuration
-@EnableConfigurationProperties(KeycloakAdminProperties.class)
+@EnableConfigurationProperties({ KeycloakAdminProperties.class, KeycloakInvitationProperties.class })
 public class KeycloakAdminConfig {
 
 	@Bean

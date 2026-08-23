@@ -2,7 +2,7 @@ package dev.onepieceapi.userservice.application.service;
 
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
-import dev.onepieceapi.userservice.domain.UserAccount;
+import dev.onepieceapi.userservice.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,11 +38,11 @@ class AdminUserQueryServiceTest {
 	@Test
 	void listsTheAccountsReturnedByTheIdentityDirectory() {
 		Pageable pageable = PageRequest.of(0, 20);
-		var luffy = new UserAccount(LUFFY_ID, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of("ADMIN"), null);
+		var luffy = new User(LUFFY_ID, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of("ADMIN"), null);
 		when(this.userDirectoryPort.findUsers(0, 20)).thenReturn(List.of(luffy));
 		when(this.userDirectoryPort.countUsers()).thenReturn(1L);
 
-		Page<UserAccount> page = this.adminUserQueryService.list(pageable);
+		Page<User> page = this.adminUserQueryService.list(pageable);
 
 		assertThat(page.getContent()).containsExactly(luffy);
 	}
@@ -50,11 +50,11 @@ class AdminUserQueryServiceTest {
 	@Test
 	void reportsTheRealmsTotalUserCountRatherThanThisPagesSize() {
 		Pageable pageable = PageRequest.of(0, 1);
-		var luffy = new UserAccount(LUFFY_ID, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of(), null);
+		var luffy = new User(LUFFY_ID, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of(), null);
 		when(this.userDirectoryPort.findUsers(0, 1)).thenReturn(List.of(luffy));
 		when(this.userDirectoryPort.countUsers()).thenReturn(37L);
 
-		Page<UserAccount> page = this.adminUserQueryService.list(pageable);
+		Page<User> page = this.adminUserQueryService.list(pageable);
 
 		assertThat(page.getTotalElements()).isEqualTo(37L);
 		assertThat(page.getContent()).hasSize(1);

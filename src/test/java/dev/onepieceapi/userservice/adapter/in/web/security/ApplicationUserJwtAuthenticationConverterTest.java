@@ -1,6 +1,7 @@
 package dev.onepieceapi.userservice.adapter.in.web.security;
 
-import dev.onepieceapi.userservice.domain.ApplicationUser;
+import dev.onepieceapi.userservice.domain.AccountStatus;
+import dev.onepieceapi.userservice.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
@@ -35,8 +36,8 @@ class ApplicationUserJwtAuthenticationConverterTest {
 
 		assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
 			.containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_EDITOR");
-		assertThat(((ApplicationUserAuthenticationToken) authentication).getApplicationUser())
-			.isEqualTo(new ApplicationUser(USER_ID, EMAIL));
+		assertThat(((ApplicationUserAuthenticationToken) authentication).getUser())
+			.isEqualTo(new User(USER_ID, EMAIL, AccountStatus.ACTIVE, List.of("ADMIN", "EDITOR"), null));
 	}
 
 	@Test
