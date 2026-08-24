@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -123,6 +124,50 @@ class KeycloakUserDirectoryAdapterTest {
 	}
 
 	@Test
+	void wrapsAKeycloakFailureWhenListingUsers() {
+		when(this.usersResource.list(0, 10)).thenThrow(new RuntimeException("Keycloak unreachable"));
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.findUsers(0, 10))
+			.isInstanceOf(KeycloakCommunicationException.class)
+			.cause()
+			.hasMessage("Keycloak unreachable");
+	}
+
+	@Test
+	void wrapsAKeycloakFailureWhenCountingUsers() {
+		when(this.usersResource.count()).thenThrow(new RuntimeException("Keycloak unreachable"));
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.countUsers())
+			.isInstanceOf(KeycloakCommunicationException.class)
+			.cause()
+			.hasMessage("Keycloak unreachable");
+	}
+
+	@Test
+	void wrapsAKeycloakFailureWhenCreatingTheAccountItself() {
+		when(this.usersResource.create(any())).thenThrow(new RuntimeException("Keycloak unreachable"));
+		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
+			.isInstanceOf(KeycloakCommunicationException.class)
+			.hasMessageContaining(INVITED_EMAIL)
+			.cause()
+			.hasMessage("Keycloak unreachable");
+	}
+
+	@Test
+	void wrapsAKeycloakFailureWhenRollingBackAnInvitation() {
+		var userResource = mock(UserResource.class);
+		when(this.usersResource.get(NAMI_ID)).thenReturn(userResource);
+		doThrow(new RuntimeException("Keycloak unreachable")).when(userResource).remove();
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.rollbackInvitation(UUID.fromString(NAMI_ID)))
+			.isInstanceOf(KeycloakCommunicationException.class)
+			.cause()
+			.hasMessage("Keycloak unreachable");
+	}
+
+	@Test
 	void invitesAUserWithNoUsableCredentialAndTheChosenRoles() {
 		var response = Response.status(Response.Status.CREATED)
 			.location(URI.create("http://keycloak/admin/realms/onepiece/users/" + NAMI_ID))
@@ -169,6 +214,9 @@ class KeycloakUserDirectoryAdapterTest {
 		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
+			.isInstanceOf(KeycloakCommunicationException.class)
+			.hasMessageContaining(INVITED_EMAIL)
+			.cause()
 			.hasMessage("Keycloak unreachable");
 
 		verify(userResource).remove();

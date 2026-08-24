@@ -57,16 +57,21 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
 	@Override
 	public List<User> findUsers(int offset, int limit) {
-		UsersResource users = getRealm().users();
+		try {
+			UsersResource users = getRealm().users();
 
-		List<CompletableFuture<User>> futures = users.list(offset, limit)
-			.stream()
-			.map(user -> fetchAsync(users, user))
-			.toList();
+			List<CompletableFuture<User>> futures = users.list(offset, limit)
+				.stream()
+				.map(user -> fetchAsync(users, user))
+				.toList();
 
-		return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
-			.thenApply(_ -> futures.stream().map(CompletableFuture::join).toList())
-			.join();
+			return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+				.thenApply(_ -> futures.stream().map(CompletableFuture::join).toList())
+				.join();
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to list users from Keycloak", ex);
+		}
 	}
 
 	private CompletableFuture<User> fetchAsync(UsersResource usersResource, UserRepresentation user) {
@@ -92,7 +97,12 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
 	@Override
 	public long countUsers() {
-		return getRealm().users().count();
+		try {
+			return getRealm().users().count();
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to count users in Keycloak", ex);
+		}
 	}
 
 	@Override
@@ -111,7 +121,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			// to activate it) that "email already registered" would then block from ever
 			// being retried.
 			deleteUser(keycloakId, ex);
-			throw ex;
+			throw new KeycloakCommunicationException("Failed to finish provisioning " + email, ex);
 		}
 
 		UUID userId = UUID.fromString(keycloakId);
@@ -137,6 +147,12 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			}
 			return CreatedResponseUtil.getCreatedId(response);
 		}
+		catch (EmailAlreadyRegisteredException ex) {
+			throw ex;
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to create Keycloak account for " + email, ex);
+		}
 	}
 
 	private static List<String> roleNames(Set<RealmRole> roles) {
@@ -145,7 +161,12 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
 	@Override
 	public void rollbackInvitation(UUID userId) {
-		getRealm().users().get(userId.toString()).remove();
+		try {
+			getRealm().users().get(userId.toString()).remove();
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to remove Keycloak user " + userId, ex);
+		}
 	}
 
 	private void deleteUser(String keycloakId, RuntimeException cause) {
