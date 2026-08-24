@@ -18,9 +18,22 @@ java {
 
 repositories {
 	mavenCentral()
+	// one-piece-exception (shared error-handling library, docs/adr/0001-exception-library-design.md
+	// in that repo) - GitHub Packages requires authentication even to resolve a public package;
+	// GITHUB_ACTOR/GITHUB_TOKEN are already set in CI, and a personal PAT with read:packages
+	// covers local dev (see that repo's README).
+	maven {
+		name = "GitHubPackages"
+		url = uri("https://maven.pkg.github.com/one-piece-api/one-piece-exception")
+		credentials {
+			username = System.getenv("GITHUB_ACTOR")
+			password = System.getenv("GITHUB_TOKEN")
+		}
+	}
 }
 
 dependencies {
+	implementation("dev.onepieceapi:one-piece-exception:0.1.0")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
 	implementation("org.springframework.boot:spring-boot-starter-validation")

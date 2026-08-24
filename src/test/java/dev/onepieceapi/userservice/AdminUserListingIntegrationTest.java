@@ -141,7 +141,11 @@ class AdminUserListingIntegrationTest {
 					""")
 			.exchange()
 			.expectStatus()
-			.isEqualTo(409);
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody())
+				.contains("\"errorCode\":\"USER_EMAIL_ALREADY_REGISTERED\"")
+				.contains("\"traceId\":"));
 	}
 
 	@Test

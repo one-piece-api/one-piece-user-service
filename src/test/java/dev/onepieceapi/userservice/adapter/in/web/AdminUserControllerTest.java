@@ -1,5 +1,6 @@
 package dev.onepieceapi.userservice.adapter.in.web;
 
+import dev.onepieceapi.exception.web.ApplicationExceptionHandler;
 import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthenticationToken;
 import dev.onepieceapi.userservice.adapter.in.web.security.SecurityConfig;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
@@ -32,15 +33,21 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Imports the real {@link SecurityConfig} (unlike {@code MeControllerTest}) specifically
  * to exercise the "/admin/**" -&gt; hasRole("ADMIN") rule itself, not just controller
- * logic given an already-authenticated principal.
+ * logic given an already-authenticated principal. Also imports the shared library's
+ * {@link ApplicationExceptionHandler} directly - a {@code @WebMvcTest} slice narrows
+ * auto-configuration to what the slice itself needs, so a third-party
+ * {@code @RestControllerAdvice} shipped via auto-configuration isn't picked up unless
+ * named explicitly (unlike {@code AdminUserListingIntegrationTest}'s full
+ * {@code @SpringBootTest} context, which loads it automatically).
  */
 @WebMvcTest(AdminUserController.class)
-@Import(SecurityConfig.class)
+@Import({ SecurityConfig.class, ApplicationExceptionHandler.class })
 class AdminUserControllerTest {
 
 	@Autowired
@@ -112,7 +119,9 @@ class AdminUserControllerTest {
 			.content("""
 					{"email": "usopp@onepiece.local", "roles": ["EDITOR"]}
 					""");
-		this.mockMvc.perform(request).andExpect(status().isConflict());
+		this.mockMvc.perform(request)
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.errorCode").value("USER_EMAIL_ALREADY_REGISTERED"));
 	}
 
 	@Test

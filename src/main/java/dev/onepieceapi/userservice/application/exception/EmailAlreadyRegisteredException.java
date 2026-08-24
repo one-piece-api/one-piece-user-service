@@ -1,5 +1,7 @@
 package dev.onepieceapi.userservice.application.exception;
 
+import dev.onepieceapi.exception.ConflictException;
+
 /**
  * Raised when an invite targets an email Keycloak already has an account for (it enforces
  * uniqueness natively, {@code duplicateEmailsAllowed: false} - see §2 of
@@ -7,10 +9,10 @@ package dev.onepieceapi.userservice.application.exception;
  * application layer and the web adapter only ever see this, never Keycloak's own 409
  * response, which is translated here by {@code KeycloakUserDirectoryAdapter}.
  */
-public class EmailAlreadyRegisteredException extends RuntimeException {
+public class EmailAlreadyRegisteredException extends ConflictException {
 
 	public EmailAlreadyRegisteredException(String email) {
-		super("An account for " + email + " already exists");
+		super(UserErrorCode.EMAIL_ALREADY_REGISTERED, "An account for " + email + " already exists");
 	}
 
 }
