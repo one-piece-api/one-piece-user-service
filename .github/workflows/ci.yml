@@ -14,6 +14,12 @@ jobs:
   lint:
     name: Lint & format
     runs-on: ubuntu-latest
+    # checkstyleMain/Test depend on compileJava (needs one-piece-exception resolved from
+    # GitHub Packages), even though checkFormat itself doesn't - set at job level so both
+    # steps have it rather than guessing per-task which one actually needs it.
+    env:
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
