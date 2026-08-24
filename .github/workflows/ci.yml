@@ -50,6 +50,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Run tests
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew test --no-daemon
 
   build-and-push:
@@ -73,6 +76,15 @@ jobs:
       - name: Read version
         id: version
         run: echo "version=$(./gradlew properties -q | grep '^version:' | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      # Builds the jar here, not inside the Dockerfile: the credentials one-piece-exception
+      # needs (GitHub Packages) then only ever need to exist in this job's own environment,
+      # not passed into the Docker build via ARG/BuildKit secrets - see Dockerfile.
+      - name: Build jar
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./gradlew bootJar --no-daemon
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

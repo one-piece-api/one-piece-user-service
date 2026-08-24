@@ -1,4 +1,13 @@
-build/
+# build/libs/*.jar is the one thing the Docker build actually needs (see Dockerfile) -
+# excluding the whole build/ tree and negating build/libs/ doesn't work in .dockerignore
+# (a parent-directory exclusion can't be re-included), so the other Gradle output
+# directories are excluded individually instead.
+build/classes/
+build/tmp/
+build/resources/
+build/generated/
+build/test-results/
+build/reports/
 .gradle/
 .git/
 .idea/
