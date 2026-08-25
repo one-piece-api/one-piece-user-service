@@ -31,8 +31,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +57,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class KeycloakUserDirectoryAdapterTest {
+
+	private static final Instant NOW = Instant.parse("2026-08-25T10:00:00Z");
 
 	private static final String LUFFY_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 
@@ -84,8 +88,9 @@ class KeycloakUserDirectoryAdapterTest {
 		var invitationProperties = new KeycloakInvitationProperties("onepiece-proxy", "http://localhost:4180/",
 				Duration.ofHours(12));
 		ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		this.keycloakUserDirectoryAdapter = new KeycloakUserDirectoryAdapter(this.keycloakAdminClient, executor,
-				adminProperties, invitationProperties);
+				adminProperties, invitationProperties, clock);
 
 		lenient().when(this.keycloakAdminClient.realm("onepiece")).thenReturn(this.realmResource);
 		lenient().when(this.realmResource.users()).thenReturn(this.usersResource);
@@ -144,7 +149,7 @@ class KeycloakUserDirectoryAdapterTest {
 		UserRepresentation pending = pendingUserWithId(NAMI_ID);
 		when(this.usersResource.list(0, 10)).thenReturn(List.of(pending));
 		mockRoles(NAMI_ID);
-		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(1)))));
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(1)))));
 
 		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
 
@@ -156,7 +161,7 @@ class KeycloakUserDirectoryAdapterTest {
 		UserRepresentation pending = pendingUserWithId(NAMI_ID);
 		when(this.usersResource.list(0, 10)).thenReturn(List.of(pending));
 		mockRoles(NAMI_ID);
-		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(13)))));
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(13)))));
 
 		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
 
@@ -278,6 +283,7 @@ class KeycloakUserDirectoryAdapterTest {
 		assertThat(invited.userId()).isEqualTo(UUID.fromString(NAMI_ID));
 		assertThat(invited.email()).isEqualTo(INVITED_EMAIL);
 		assertThat(invited.status()).isEqualTo(AccountStatus.PENDING);
+		assertThat(invited.createdAt()).isEqualTo(NOW);
 		assertThat(invited.roles()).containsExactly("EDITOR");
 	}
 
@@ -328,7 +334,7 @@ class KeycloakUserDirectoryAdapterTest {
 	@Test
 	void resendsTheInvitationEmailForAnExpiredInvitation() {
 		var userResource = mockPendingUser(NAMI_ID);
-		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(13)))));
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(13)))));
 
 		User result = this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID));
 
@@ -342,7 +348,7 @@ class KeycloakUserDirectoryAdapterTest {
 	@Test
 	void refusesToResendWhileTheCurrentInvitationIsStillValid() {
 		var userResource = mockPendingUser(NAMI_ID);
-		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(1)))));
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(1)))));
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
 			.isInstanceOf(InvitationNotResendableException.class);
@@ -374,7 +380,7 @@ class KeycloakUserDirectoryAdapterTest {
 	@Test
 	void wrapsAKeycloakFailureWhenResendingAnInvitation() {
 		var userResource = mockPendingUser(NAMI_ID);
-		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(13)))));
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(13)))));
 		doThrow(new RuntimeException("Keycloak unreachable")).when(userResource)
 			.executeActionsEmail(any(), any(), any(), any());
 

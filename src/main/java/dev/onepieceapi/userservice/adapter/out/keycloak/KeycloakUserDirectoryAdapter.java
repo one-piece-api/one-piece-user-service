@@ -25,6 +25,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -69,6 +70,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	 */
 	private static final List<String> ACTIONS = List.of("ACTION");
 
+	private static final String EXECUTE_ACTIONS_EMAIL_PATH = "users/%s/execute-actions-email";
+
 	private final Keycloak keycloakAdminClient;
 
 	private final ExecutorService keycloakAdminExecutor;
@@ -76,6 +79,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	private final KeycloakAdminProperties keycloakAdminProperties;
 
 	private final KeycloakInvitationProperties keycloakInvitationProperties;
+
+	private final Clock clock;
 
 	@Override
 	public List<User> findUsers(int offset, int limit) {
@@ -124,11 +129,11 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			return false;
 		}
 		Duration lifespan = this.keycloakInvitationProperties.tokenLifespan();
-		return lastSentAt.plus(lifespan).isBefore(Instant.now());
+		return lastSentAt.plus(lifespan).isBefore(Instant.now(this.clock));
 	}
 
 	private Instant lastInvitationSentAt(UUID userId) {
-		String path = "users/" + userId + "/execute-actions-email";
+		String path = String.format(EXECUTE_ACTIONS_EMAIL_PATH, userId);
 		List<AdminEventRepresentation> events = actionEvents(path);
 		return events.isEmpty() ? null : Instant.ofEpochMilli(events.getFirst().getTime());
 	}
@@ -178,7 +183,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		}
 
 		UUID userId = UUID.fromString(keycloakId);
-		return new User(userId, email, AccountStatus.PENDING, roleNames(roles), Instant.now());
+		return new User(userId, email, AccountStatus.PENDING, roleNames(roles), Instant.now(this.clock));
 	}
 
 	private String createUnactivatedUser(UsersResource users, String email) {
