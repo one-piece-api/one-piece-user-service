@@ -7,6 +7,6 @@ package dev.onepieceapi.userservice.domain;
  */
 public enum AuditAction {
 
-	USER_INVITED
+	USER_INVITED, INVITATION_RESENT
 
 }

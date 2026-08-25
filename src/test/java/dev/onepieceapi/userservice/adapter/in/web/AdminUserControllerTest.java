@@ -4,6 +4,8 @@ import dev.onepieceapi.exception.web.ApplicationExceptionHandler;
 import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthenticationToken;
 import dev.onepieceapi.userservice.adapter.in.web.security.SecurityConfig;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
+import dev.onepieceapi.userservice.application.exception.InvitationNotPendingException;
+import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
 import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
@@ -133,6 +135,47 @@ class AdminUserControllerTest {
 			.content("""
 					{"email": "usopp@onepiece.local", "roles": ["EDITOR"]}
 					""");
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void anAdminCanResendAnInvitation() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		var target = new User(targetId, "usopp@onepiece.local", AccountStatus.PENDING, List.of("EDITOR"),
+				Instant.EPOCH);
+		when(this.adminUserInvitationService.resend(targetId, luffy)).thenReturn(target);
+
+		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void resendingForAnUnknownUserReturnsNotFound() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		when(this.adminUserInvitationService.resend(targetId, luffy)).thenThrow(new UserNotFoundException(targetId));
+
+		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void resendingForAnAlreadyActiveUserReturnsConflict() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		when(this.adminUserInvitationService.resend(targetId, luffy))
+			.thenThrow(new InvitationNotPendingException(targetId));
+
+		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isConflict());
+	}
+
+	@Test
+	void aNonAdminCannotResendAnInvitation() throws Exception {
+		var nami = nami();
+
+		var request = post("/admin/users/" + UUID.randomUUID() + "/resend-invitation").with(asUser(nami, "EDITOR"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 

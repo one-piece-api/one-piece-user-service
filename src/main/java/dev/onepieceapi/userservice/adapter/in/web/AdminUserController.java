@@ -16,13 +16,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 /**
- * The user listing from UF-IDU-17 and the invite endpoint from UF-IDU-01. ADMIN-only
- * access is enforced in {@code SecurityConfig} ("/admin/**"), not here.
+ * The user listing from UF-IDU-17, the invite endpoint from UF-IDU-01, and the resend
+ * endpoint from UF-IDU-03. ADMIN-only access is enforced in {@code SecurityConfig}
+ * ("/admin/**"), not here.
  */
 @RestController
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -44,6 +48,12 @@ class AdminUserController {
 			@AuthenticationPrincipal User user) {
 		var invited = this.adminUserInvitationService.invite(request.email(), request.roles(), user);
 		return ResponseEntity.status(HttpStatus.CREATED).body(UserSummaryResponseMapper.toResponse(invited));
+	}
+
+	@PostMapping("/admin/users/{userId}/resend-invitation")
+	UserSummaryResponse resendInvitation(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
+		var target = this.adminUserInvitationService.resend(userId, user);
+		return UserSummaryResponseMapper.toResponse(target);
 	}
 
 }

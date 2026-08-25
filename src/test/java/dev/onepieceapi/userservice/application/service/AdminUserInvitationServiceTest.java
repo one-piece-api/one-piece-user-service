@@ -121,4 +121,30 @@ class AdminUserInvitationServiceTest {
 			.isSameAs(auditFailure);
 	}
 
+	@Test
+	void resendsTheInvitationThroughTheIdentityDirectoryAndRecordsWhoDidIt() {
+		var pending = new User(INVITED_ID, INVITED_EMAIL, AccountStatus.PENDING, List.of("EDITOR"), NOW);
+		when(this.userDirectoryPort.resendInvitation(INVITED_ID)).thenReturn(pending);
+
+		User result = this.adminUserInvitationService.resend(INVITED_ID, ADMIN);
+
+		assertThat(result).isEqualTo(pending);
+		verify(this.auditLogPort).record(this.auditEventCaptor.capture());
+		AuditEvent event = this.auditEventCaptor.getValue();
+		assertThat(event.action()).isEqualTo(AuditAction.INVITATION_RESENT);
+		assertThat(event.actorUserId()).isEqualTo(ADMIN.userId());
+		assertThat(event.targetUserId()).isEqualTo(INVITED_ID);
+		assertThat(event.occurredAt()).isEqualTo(NOW);
+	}
+
+	@Test
+	void doesNotRecordAnAuditEventWhenResendFails() {
+		when(this.userDirectoryPort.resendInvitation(INVITED_ID)).thenThrow(new RuntimeException("Keycloak unreachable"));
+
+		assertThatThrownBy(() -> this.adminUserInvitationService.resend(INVITED_ID, ADMIN))
+			.isInstanceOf(RuntimeException.class);
+
+		verifyNoInteractions(this.auditLogPort);
+	}
+
 }

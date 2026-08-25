@@ -3,9 +3,12 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakInvitationProperties;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
+import dev.onepieceapi.userservice.application.exception.InvitationNotPendingException;
+import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -190,10 +193,11 @@ class KeycloakUserDirectoryAdapterTest {
 		assertThat(createdUser.getUsername()).isEqualTo(INVITED_EMAIL);
 		assertThat(createdUser.getEmail()).isEqualTo(INVITED_EMAIL);
 		assertThat(createdUser.isEnabled()).isTrue();
-		assertThat(createdUser.getRequiredActions()).containsExactly("UPDATE_PASSWORD", "VERIFY_EMAIL");
+		assertThat(createdUser.getRequiredActions()).containsExactly("UPDATE_PASSWORD", "UPDATE_PROFILE",
+				"VERIFY_EMAIL");
 		verify(realmRoleScopeResource).add(List.of(editorRole));
 		verify(userResource).executeActionsEmail("onepiece-proxy", "http://localhost:4180/",
-				List.of("UPDATE_PASSWORD", "VERIFY_EMAIL"));
+				List.of("UPDATE_PASSWORD", "UPDATE_PROFILE", "VERIFY_EMAIL"));
 		assertThat(invited.userId()).isEqualTo(UUID.fromString(NAMI_ID));
 		assertThat(invited.email()).isEqualTo(INVITED_EMAIL);
 		assertThat(invited.status()).isEqualTo(AccountStatus.PENDING);
@@ -242,6 +246,64 @@ class KeycloakUserDirectoryAdapterTest {
 			.isInstanceOf(EmailAlreadyRegisteredException.class);
 
 		verify(this.usersResource, never()).get(any());
+	}
+
+	@Test
+	void resendsTheInvitationEmailForAStillPendingUser() {
+		var userResource = mockPendingUser(NAMI_ID);
+
+		User result = this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID));
+
+		verify(userResource).executeActionsEmail("onepiece-proxy", "http://localhost:4180/",
+				List.of("UPDATE_PASSWORD", "UPDATE_PROFILE", "VERIFY_EMAIL"));
+		assertThat(result.status()).isEqualTo(AccountStatus.PENDING);
+	}
+
+	@Test
+	void refusesToResendForAUserThatDoesNotExist() {
+		when(this.usersResource.get(NAMI_ID)).thenThrow(new NotFoundException());
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
+			.isInstanceOf(UserNotFoundException.class);
+	}
+
+	@Test
+	void refusesToResendForAUserThatIsAlreadyActive() {
+		var userResource = mockPendingUser(NAMI_ID);
+		UserRepresentation representation = userWithId(NAMI_ID);
+		representation.setRequiredActions(List.of());
+		when(userResource.toRepresentation()).thenReturn(representation);
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
+			.isInstanceOf(InvitationNotPendingException.class);
+
+		verify(userResource, never()).executeActionsEmail(any(), any(), any());
+	}
+
+	@Test
+	void wrapsAKeycloakFailureWhenResendingAnInvitation() {
+		var userResource = mockPendingUser(NAMI_ID);
+		doThrow(new RuntimeException("Keycloak unreachable")).when(userResource)
+			.executeActionsEmail(any(), any(), any());
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
+			.isInstanceOf(KeycloakCommunicationException.class)
+			.cause()
+			.hasMessage("Keycloak unreachable");
+	}
+
+	private UserResource mockPendingUser(String keycloakId) {
+		var userResource = mock(UserResource.class);
+		when(this.usersResource.get(keycloakId)).thenReturn(userResource);
+		UserRepresentation representation = userWithId(keycloakId);
+		representation.setRequiredActions(List.of("UPDATE_PASSWORD", "UPDATE_PROFILE", "VERIFY_EMAIL"));
+		when(userResource.toRepresentation()).thenReturn(representation);
+		var roleMappingResource = mock(RoleMappingResource.class);
+		var realmRoleScopeResource = mock(RoleScopeResource.class);
+		when(userResource.roles()).thenReturn(roleMappingResource);
+		when(roleMappingResource.realmLevel()).thenReturn(realmRoleScopeResource);
+		when(realmRoleScopeResource.listAll()).thenReturn(List.of());
+		return userResource;
 	}
 
 	private RoleRepresentation mockRoleRepresentation(RolesResource rolesResource, String roleName) {

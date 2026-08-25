@@ -3,10 +3,13 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakInvitationProperties;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
+import dev.onepieceapi.userservice.application.exception.InvitationNotPendingException;
+import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,12 +43,17 @@ import java.util.function.Supplier;
 public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
 	/**
-	 * Set on invite (UF-IDU-01) so the account has no usable credential until the invited
-	 * user completes both - see {@link KeycloakUserMapper} for how account status is
-	 * derived from these, and {@code KeycloakInvitationProperties} for where they are
-	 * sent.
+	 * Set on invite (UF-IDU-01) and re-sent as-is on resend (UF-IDU-03), so the invited
+	 * user completes all three on Keycloak's own hosted pages before the account becomes
+	 * usable: sets a password, chooses the {@code username} (UF-IDU-02 - Keycloak's native
+	 * "Update Profile" screen, username editable by the account owner), and confirms the
+	 * email address (UF-IDU-04). See {@link KeycloakUserMapper} for how account status is
+	 * derived from these, and {@code KeycloakInvitationProperties} for where the browser is
+	 * sent once all three are done. Keycloak itself decides the on-screen order, not this
+	 * list.
 	 */
-	private static final List<String> INVITATION_REQUIRED_ACTIONS = List.of("UPDATE_PASSWORD", "VERIFY_EMAIL");
+	private static final List<String> INVITATION_REQUIRED_ACTIONS = List.of("UPDATE_PASSWORD", "UPDATE_PROFILE",
+			"VERIFY_EMAIL");
 
 	private final Keycloak keycloakAdminClient;
 
@@ -166,6 +174,42 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		}
 		catch (RuntimeException ex) {
 			throw new KeycloakCommunicationException("Failed to remove Keycloak user " + userId, ex);
+		}
+	}
+
+	@Override
+	public User resendInvitation(UUID userId) {
+		UsersResource users = getRealm().users();
+		User user;
+		try {
+			user = toUser(users, requireRepresentation(users, userId));
+		}
+		catch (UserNotFoundException ex) {
+			throw ex;
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to load Keycloak user " + userId, ex);
+		}
+
+		if (user.status() != AccountStatus.PENDING) {
+			throw new InvitationNotPendingException(userId);
+		}
+
+		try {
+			triggerInvitationEmail(users, userId.toString());
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to resend invitation for " + userId, ex);
+		}
+		return user;
+	}
+
+	private UserRepresentation requireRepresentation(UsersResource users, UUID userId) {
+		try {
+			return users.get(userId.toString()).toRepresentation();
+		}
+		catch (NotFoundException ex) {
+			throw new UserNotFoundException(userId);
 		}
 	}
 

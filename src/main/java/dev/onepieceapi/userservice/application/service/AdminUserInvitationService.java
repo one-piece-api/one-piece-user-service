@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * UF-IDU-01: invites a new application user. Provisioning the identity and recording the
@@ -24,6 +25,10 @@ import java.util.Set;
  * fails, the invitation is rolled back ({@link UserDirectoryPort#rollbackInvitation}) so
  * the operation is all-or-nothing from the caller's perspective, rather than leaving a
  * real invitation with no audit trail.
+ * <p>
+ * Also handles resending an invitation (UF-IDU-03): unlike a fresh invite, there is
+ * nothing to compensate if the audit write fails - the account already existed and the
+ * email was already re-sent, so a failure here is logged and rethrown, not rolled back.
  */
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -48,6 +53,12 @@ public class AdminUserInvitationService {
 		}
 
 		return invited;
+	}
+
+	public User resend(UUID userId, User actor) {
+		User target = this.userDirectoryPort.resendInvitation(userId);
+		this.auditLogPort.record(AuditEventMapper.invitationResent(actor, target, Instant.now(this.clock)));
+		return target;
 	}
 
 	private void rollBackInvitation(User invited, RuntimeException cause) {

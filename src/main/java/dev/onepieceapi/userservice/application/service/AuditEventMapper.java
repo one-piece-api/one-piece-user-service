@@ -20,4 +20,9 @@ class AuditEventMapper {
 				invited.email(), occurredAt);
 	}
 
+	AuditEvent invitationResent(User actor, User target, Instant occurredAt) {
+		return new AuditEvent(AuditAction.INVITATION_RESENT, actor.userId(), actor.email(), target.userId(),
+				target.email(), occurredAt);
+	}
+
 }
