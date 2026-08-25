@@ -3,6 +3,7 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakInvitationProperties;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
+import dev.onepieceapi.userservice.application.exception.EmailDeliveryFailedException;
 import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.AccountStatus;
@@ -310,6 +311,33 @@ class KeycloakUserDirectoryAdapterTest {
 	}
 
 	@Test
+	void rollsBackTheCreatedUserWhenEmailDispatchFails() {
+		var response = Response.status(Response.Status.CREATED)
+			.location(URI.create("http://keycloak/admin/realms/onepiece/users/" + NAMI_ID))
+			.build();
+		when(this.usersResource.create(any())).thenReturn(response);
+		var userResource = mock(UserResource.class);
+		when(this.usersResource.get(NAMI_ID)).thenReturn(userResource);
+		var roleMappingResource = mock(RoleMappingResource.class);
+		var realmRoleScopeResource = mock(RoleScopeResource.class);
+		when(userResource.roles()).thenReturn(roleMappingResource);
+		when(roleMappingResource.realmLevel()).thenReturn(realmRoleScopeResource);
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		mockRoleRepresentation(rolesResource, "EDITOR");
+		doThrow(new RuntimeException("550 You can only send testing emails to your own email address"))
+			.when(userResource)
+			.executeActionsEmail(any(), any(), any(), any());
+		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
+			.isInstanceOf(EmailDeliveryFailedException.class)
+			.hasMessageContaining(INVITED_EMAIL);
+
+		verify(userResource).remove();
+	}
+
+	@Test
 	void rollbackInvitationRemovesTheKeycloakUser() {
 		var userResource = mock(UserResource.class);
 		when(this.usersResource.get(NAMI_ID)).thenReturn(userResource);
@@ -378,16 +406,15 @@ class KeycloakUserDirectoryAdapterTest {
 	}
 
 	@Test
-	void wrapsAKeycloakFailureWhenResendingAnInvitation() {
+	void raisesEmailDeliveryFailedWhenResendingAnInvitationCannotBeSent() {
 		var userResource = mockPendingUser(NAMI_ID);
 		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(13)))));
-		doThrow(new RuntimeException("Keycloak unreachable")).when(userResource)
+		doThrow(new RuntimeException("550 You can only send testing emails to your own email address"))
+			.when(userResource)
 			.executeActionsEmail(any(), any(), any(), any());
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
-			.isInstanceOf(KeycloakCommunicationException.class)
-			.cause()
-			.hasMessage("Keycloak unreachable");
+			.isInstanceOf(EmailDeliveryFailedException.class);
 	}
 
 	private UserResource mockPendingUser(String keycloakId) {

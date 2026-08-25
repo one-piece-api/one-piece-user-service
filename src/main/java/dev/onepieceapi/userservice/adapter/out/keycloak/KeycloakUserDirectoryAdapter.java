@@ -3,6 +3,7 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakInvitationProperties;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
+import dev.onepieceapi.userservice.application.exception.EmailDeliveryFailedException;
 import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
@@ -168,18 +169,28 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		UsersResource users = getRealm().users();
 		String keycloakId = createUnactivatedUser(users, email);
 
+		// Role assignment and email dispatch are separate Keycloak calls with no
+		// transaction spanning the create above - without rolling back on either
+		// failure, a half-provisioned account (created, but with no roles and/or no way
+		// to activate it) would block from ever being retried by "email already
+		// registered". Role assignment failing is a genuine, unanticipated
+		// Keycloak-communication problem; the email failing is not - see
+		// EmailDeliveryFailedException.
 		try {
 			assignRealmRoles(users, keycloakId, roles);
+		}
+		catch (RuntimeException ex) {
+			deleteUser(keycloakId, ex);
+			throw new KeycloakCommunicationException("Failed to finish provisioning " + email, ex);
+		}
+
+		try {
 			triggerInvitationEmail(users, keycloakId);
 		}
 		catch (RuntimeException ex) {
-			// Role assignment/email dispatch are separate Keycloak calls with no
-			// transaction spanning the create above - without this, a failure here would
-			// leave a half-provisioned account (created, but with no roles and/or no way
-			// to activate it) that "email already registered" would then block from ever
-			// being retried.
+			log.warn("Could not send the invitation email to {}", email, ex);
 			deleteUser(keycloakId, ex);
-			throw new KeycloakCommunicationException("Failed to finish provisioning " + email, ex);
+			throw new EmailDeliveryFailedException(email);
 		}
 
 		UUID userId = UUID.fromString(keycloakId);
@@ -249,7 +260,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			triggerInvitationEmail(users, userId.toString());
 		}
 		catch (RuntimeException ex) {
-			throw new KeycloakCommunicationException("Failed to resend invitation for " + userId, ex);
+			log.warn("Could not resend the invitation email for {}", userId, ex);
+			throw new EmailDeliveryFailedException(user.email());
 		}
 		// A fresh link was just issued - the account is PENDING again, not still expired,
 		// so the caller (and the admin listing it feeds, once reloaded) reflects that
