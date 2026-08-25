@@ -1,6 +1,8 @@
 {
   "realm": "onepiece",
   "enabled": true,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false,
   "smtpServer": {
     "host": "host.testcontainers.internal",
     "port": "3025",
@@ -47,7 +49,7 @@
       "enabled": true,
       "serviceAccountClientId": "user-service-admin",
       "clientRoles": {
-        "realm-management": ["view-realm", "view-users", "query-users", "manage-users"]
+        "realm-management": ["view-realm", "view-users", "query-users", "manage-users", "view-events"]
       }
     },
     {

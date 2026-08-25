@@ -3,7 +3,7 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakInvitationProperties;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
-import dev.onepieceapi.userservice.application.exception.InvitationNotPendingException;
+import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
@@ -21,14 +21,18 @@ import org.keycloak.admin.client.resource.RoleScopeResource;
 import org.keycloak.admin.client.resource.RolesResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
+import org.keycloak.representations.idm.AdminEventRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -39,6 +43,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -74,7 +81,8 @@ class KeycloakUserDirectoryAdapterTest {
 		String clientId = "user-service-admin";
 		var adminProperties = new KeycloakAdminProperties("http://keycloak", "onepiece", clientId, "secret",
 				Set.of("default-roles-onepiece"));
-		var invitationProperties = new KeycloakInvitationProperties("onepiece-proxy", "http://localhost:4180/");
+		var invitationProperties = new KeycloakInvitationProperties("onepiece-proxy", "http://localhost:4180/",
+				Duration.ofHours(12));
 		ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 		this.keycloakUserDirectoryAdapter = new KeycloakUserDirectoryAdapter(this.keycloakAdminClient, executor,
 				adminProperties, invitationProperties);
@@ -117,6 +125,75 @@ class KeycloakUserDirectoryAdapterTest {
 		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
 
 		assertThat(users.getFirst().roles()).containsExactly("ADMIN");
+	}
+
+	@Test
+	void aPendingUserWithNoRecordedInvitationEventStaysPending() {
+		UserRepresentation pending = pendingUserWithId(NAMI_ID);
+		when(this.usersResource.list(0, 10)).thenReturn(List.of(pending));
+		mockRoles(NAMI_ID);
+		mockAdminEvents(NAMI_ID, List.of());
+
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+
+		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.PENDING);
+	}
+
+	@Test
+	void aPendingUserWithARecentInvitationEventStaysPending() {
+		UserRepresentation pending = pendingUserWithId(NAMI_ID);
+		when(this.usersResource.list(0, 10)).thenReturn(List.of(pending));
+		mockRoles(NAMI_ID);
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(1)))));
+
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+
+		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.PENDING);
+	}
+
+	@Test
+	void aPendingUserWithAStaleInvitationEventBecomesExpired() {
+		UserRepresentation pending = pendingUserWithId(NAMI_ID);
+		when(this.usersResource.list(0, 10)).thenReturn(List.of(pending));
+		mockRoles(NAMI_ID);
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(13)))));
+
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+
+		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.INVITATION_EXPIRED);
+	}
+
+	@Test
+	void anActiveUserNeverTriggersAnAdminEventsLookup() {
+		UserRepresentation active = userWithId(LUFFY_ID);
+		when(this.usersResource.list(0, 10)).thenReturn(List.of(active));
+		mockRoles(LUFFY_ID, "ADMIN");
+
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+
+		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.ACTIVE);
+		verifyNoAdminEventsCall();
+	}
+
+	/**
+	 * {@code str()} (not {@code any()}) at the {@code dateFrom}/{@code dateTo} positions:
+	 * see {@link #mockAdminEvents}'s javadoc on why a generic matcher is ambiguous there
+	 * specifically. Every other position has only one possible type across
+	 * {@code RealmResource}'s overloads, so a plain {@code any()} is unambiguous.
+	 * {@code w()} (a fresh {@code any()} per call, not a reused value - same reason) and
+	 * {@code str()} keep the 12-argument call under the line-length limit.
+	 */
+	private void verifyNoAdminEventsCall() {
+		var mode = verify(this.realmResource, never());
+		mode.getAdminEvents(w(), w(), w(), w(), w(), w(), w(), str(), str(), w(), w(), w());
+	}
+
+	private static <T> T w() {
+		return any();
+	}
+
+	private static String str() {
+		return anyString();
 	}
 
 	@Test
@@ -196,7 +273,7 @@ class KeycloakUserDirectoryAdapterTest {
 		assertThat(createdUser.getRequiredActions()).containsExactly("UPDATE_PASSWORD", "UPDATE_PROFILE",
 				"VERIFY_EMAIL");
 		verify(realmRoleScopeResource).add(List.of(editorRole));
-		verify(userResource).executeActionsEmail("onepiece-proxy", "http://localhost:4180/",
+		verify(userResource).executeActionsEmail("onepiece-proxy", "http://localhost:4180/", 43200,
 				List.of("UPDATE_PASSWORD", "UPDATE_PROFILE", "VERIFY_EMAIL"));
 		assertThat(invited.userId()).isEqualTo(UUID.fromString(NAMI_ID));
 		assertThat(invited.email()).isEqualTo(INVITED_EMAIL);
@@ -249,14 +326,28 @@ class KeycloakUserDirectoryAdapterTest {
 	}
 
 	@Test
-	void resendsTheInvitationEmailForAStillPendingUser() {
+	void resendsTheInvitationEmailForAnExpiredInvitation() {
 		var userResource = mockPendingUser(NAMI_ID);
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(13)))));
 
 		User result = this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID));
 
-		verify(userResource).executeActionsEmail("onepiece-proxy", "http://localhost:4180/",
+		verify(userResource).executeActionsEmail("onepiece-proxy", "http://localhost:4180/", 43200,
 				List.of("UPDATE_PASSWORD", "UPDATE_PROFILE", "VERIFY_EMAIL"));
+		// A fresh link was just sent - the returned status reflects that, not the
+		// pre-resend INVITATION_EXPIRED it was gated on.
 		assertThat(result.status()).isEqualTo(AccountStatus.PENDING);
+	}
+
+	@Test
+	void refusesToResendWhileTheCurrentInvitationIsStillValid() {
+		var userResource = mockPendingUser(NAMI_ID);
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(1)))));
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
+			.isInstanceOf(InvitationNotResendableException.class);
+
+		verify(userResource, never()).executeActionsEmail(any(), any(), any(), any());
 	}
 
 	@Test
@@ -275,16 +366,17 @@ class KeycloakUserDirectoryAdapterTest {
 		when(userResource.toRepresentation()).thenReturn(representation);
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
-			.isInstanceOf(InvitationNotPendingException.class);
+			.isInstanceOf(InvitationNotResendableException.class);
 
-		verify(userResource, never()).executeActionsEmail(any(), any(), any());
+		verify(userResource, never()).executeActionsEmail(any(), any(), any(), any());
 	}
 
 	@Test
 	void wrapsAKeycloakFailureWhenResendingAnInvitation() {
 		var userResource = mockPendingUser(NAMI_ID);
+		mockAdminEvents(NAMI_ID, List.of(adminEventAt(Instant.now().minus(Duration.ofHours(13)))));
 		doThrow(new RuntimeException("Keycloak unreachable")).when(userResource)
-			.executeActionsEmail(any(), any(), any());
+			.executeActionsEmail(any(), any(), any(), any());
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
 			.isInstanceOf(KeycloakCommunicationException.class)
@@ -295,15 +387,52 @@ class KeycloakUserDirectoryAdapterTest {
 	private UserResource mockPendingUser(String keycloakId) {
 		var userResource = mock(UserResource.class);
 		when(this.usersResource.get(keycloakId)).thenReturn(userResource);
-		UserRepresentation representation = userWithId(keycloakId);
-		representation.setRequiredActions(List.of("UPDATE_PASSWORD", "UPDATE_PROFILE", "VERIFY_EMAIL"));
-		when(userResource.toRepresentation()).thenReturn(representation);
+		when(userResource.toRepresentation()).thenReturn(pendingUserWithId(keycloakId));
 		var roleMappingResource = mock(RoleMappingResource.class);
 		var realmRoleScopeResource = mock(RoleScopeResource.class);
 		when(userResource.roles()).thenReturn(roleMappingResource);
 		when(roleMappingResource.realmLevel()).thenReturn(realmRoleScopeResource);
 		when(realmRoleScopeResource.listAll()).thenReturn(List.of());
 		return userResource;
+	}
+
+	/**
+	 * Stubs the admin-events lookup {@code isInvitationExpired} performs for
+	 * {@code keycloakId}. {@code <String>isNull()} at the {@code dateFrom}/{@code dateTo}
+	 * positions pins the overload with {@code String} there - {@code RealmResource} also
+	 * has one taking {@code long}/{@code long}, and a bare {@code isNull()} would be
+	 * ambiguous between the two. Each matcher is called inline, right where its value is
+	 * used - Mockito registers a matcher when the method producing it runs, not where its
+	 * (always {@code null}) return value ends up, so precomputing any of these into a
+	 * local variable beforehand would register it too early and misalign every matcher
+	 * after it.
+	 */
+	private void mockAdminEvents(String keycloakId, List<AdminEventRepresentation> events) {
+		String resourcePath = "users/" + keycloakId + "/execute-actions-email";
+		when(this.realmResource.getAdminEvents(eq(List.of("ACTION")), isNull(), isNull(), isNull(), isNull(),
+				eq(resourcePath), isNull(), noDate(), noDate(), eq(0), eq(1), eq("desc")))
+			.thenReturn(events);
+	}
+
+	/**
+	 * Inline shorthand for {@code ArgumentMatchers.<String>isNull()} - must still be
+	 * called fresh at each {@code dateFrom}/{@code dateTo} position (see
+	 * {@link #mockAdminEvents}'s javadoc), just under a shorter name.
+	 */
+	private static String noDate() {
+		return ArgumentMatchers.<String>isNull();
+	}
+
+	private static AdminEventRepresentation adminEventAt(Instant time) {
+		var event = new AdminEventRepresentation();
+		event.setTime(time.toEpochMilli());
+		return event;
+	}
+
+	private static UserRepresentation pendingUserWithId(String keycloakId) {
+		UserRepresentation user = userWithId(keycloakId);
+		user.setRequiredActions(List.of("UPDATE_PASSWORD", "UPDATE_PROFILE", "VERIFY_EMAIL"));
+		return user;
 	}
 
 	private RoleRepresentation mockRoleRepresentation(RolesResource rolesResource, String roleName) {

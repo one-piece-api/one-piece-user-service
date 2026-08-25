@@ -4,7 +4,7 @@ import dev.onepieceapi.exception.web.ApplicationExceptionHandler;
 import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthenticationToken;
 import dev.onepieceapi.userservice.adapter.in.web.security.SecurityConfig;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
-import dev.onepieceapi.userservice.application.exception.InvitationNotPendingException;
+import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
 import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
@@ -162,14 +162,16 @@ class AdminUserControllerTest {
 	}
 
 	@Test
-	void resendingForAnAlreadyActiveUserReturnsConflict() throws Exception {
+	void resendingWhenNotResendableReturnsConflict() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
 		when(this.adminUserInvitationService.resend(targetId, luffy))
-			.thenThrow(new InvitationNotPendingException(targetId));
+			.thenThrow(new InvitationNotResendableException(targetId));
 
 		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(luffy, "ADMIN"));
-		this.mockMvc.perform(request).andExpect(status().isConflict());
+		this.mockMvc.perform(request)
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.errorCode").value("USER_INVITATION_NOT_RESENDABLE"));
 	}
 
 	@Test

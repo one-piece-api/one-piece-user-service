@@ -3,7 +3,7 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakInvitationProperties;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
-import dev.onepieceapi.userservice.application.exception.InvitationNotPendingException;
+import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
@@ -17,12 +17,15 @@ import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.RolesResource;
+import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
+import org.keycloak.representations.idm.AdminEventRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -54,6 +57,17 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	 */
 	private static final List<String> INVITATION_REQUIRED_ACTIONS = List.of("UPDATE_PASSWORD", "UPDATE_PROFILE",
 			"VERIFY_EMAIL");
+
+	/**
+	 * Keycloak's own admin-events log (realm setting {@code adminEventsEnabled}, see
+	 * {@code onepiece-infrastructure}) already records every
+	 * {@code execute-actions-email} call as an {@code ACTION} event with
+	 * {@code resourcePath} "users/{userId}/execute-actions-email" - queried here
+	 * (UF-IDU-03) to find when the current invitation was last (re)sent, rather than this
+	 * application tracking that itself. See
+	 * {@code docs/adr/0004-invitation-expiry-gating.md}.
+	 */
+	private static final List<String> ACTIONS = List.of("ACTION");
 
 	private final Keycloak keycloakAdminClient;
 
@@ -89,7 +103,38 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
 	private User toUser(UsersResource usersResource, UserRepresentation user) {
 		List<String> realmRoles = fetchRealmRoles(usersResource, user.getId());
-		return KeycloakUserMapper.toUser(user, realmRoles);
+		User mapped = KeycloakUserMapper.toUser(user, realmRoles);
+		return mapped.status() == AccountStatus.PENDING ? withExpiryResolved(mapped) : mapped;
+	}
+
+	private User withExpiryResolved(User pendingUser) {
+		if (!isInvitationExpired(pendingUser.userId())) {
+			return pendingUser;
+		}
+		return new User(pendingUser.userId(), pendingUser.email(), AccountStatus.INVITATION_EXPIRED,
+				pendingUser.roles(), pendingUser.createdAt());
+	}
+
+	private boolean isInvitationExpired(UUID userId) {
+		Instant lastSentAt = lastInvitationSentAt(userId);
+		if (lastSentAt == null) {
+			// No recorded event at all (e.g. admin events were only just enabled, or the
+			// account predates that) - nothing to compare against, so treat it as still
+			// within its window rather than guessing it has expired.
+			return false;
+		}
+		Duration lifespan = this.keycloakInvitationProperties.tokenLifespan();
+		return lastSentAt.plus(lifespan).isBefore(Instant.now());
+	}
+
+	private Instant lastInvitationSentAt(UUID userId) {
+		String path = "users/" + userId + "/execute-actions-email";
+		List<AdminEventRepresentation> events = actionEvents(path);
+		return events.isEmpty() ? null : Instant.ofEpochMilli(events.getFirst().getTime());
+	}
+
+	private List<AdminEventRepresentation> actionEvents(String path) {
+		return getRealm().getAdminEvents(ACTIONS, null, null, null, null, path, null, null, null, 0, 1, "desc");
 	}
 
 	private List<String> fetchRealmRoles(UsersResource usersResource, String userId) {
@@ -191,8 +236,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			throw new KeycloakCommunicationException("Failed to load Keycloak user " + userId, ex);
 		}
 
-		if (user.status() != AccountStatus.PENDING) {
-			throw new InvitationNotPendingException(userId);
+		if (user.status() != AccountStatus.INVITATION_EXPIRED) {
+			throw new InvitationNotResendableException(userId);
 		}
 
 		try {
@@ -201,7 +246,10 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		catch (RuntimeException ex) {
 			throw new KeycloakCommunicationException("Failed to resend invitation for " + userId, ex);
 		}
-		return user;
+		// A fresh link was just issued - the account is PENDING again, not still expired,
+		// so the caller (and the admin listing it feeds, once reloaded) reflects that
+		// immediately rather than the pre-resend status.
+		return new User(user.userId(), user.email(), AccountStatus.PENDING, user.roles(), user.createdAt());
 	}
 
 	private UserRepresentation requireRepresentation(UsersResource users, UUID userId) {
@@ -234,9 +282,11 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	}
 
 	private void triggerInvitationEmail(UsersResource users, String keycloakId) {
-		users.get(keycloakId)
-			.executeActionsEmail(this.keycloakInvitationProperties.redirectClientId(),
-					this.keycloakInvitationProperties.redirectUri(), INVITATION_REQUIRED_ACTIONS);
+		String clientId = this.keycloakInvitationProperties.redirectClientId();
+		String redirectUri = this.keycloakInvitationProperties.redirectUri();
+		int lifespanSeconds = (int) this.keycloakInvitationProperties.tokenLifespan().toSeconds();
+		UserResource userResource = users.get(keycloakId);
+		userResource.executeActionsEmail(clientId, redirectUri, lifespanSeconds, INVITATION_REQUIRED_ACTIONS);
 	}
 
 	private RealmResource getRealm() {

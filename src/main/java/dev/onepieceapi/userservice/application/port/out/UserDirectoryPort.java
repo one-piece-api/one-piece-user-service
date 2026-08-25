@@ -1,7 +1,7 @@
 package dev.onepieceapi.userservice.application.port.out;
 
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
-import dev.onepieceapi.userservice.application.exception.InvitationNotPendingException;
+import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
@@ -44,14 +44,16 @@ public interface UserDirectoryPort {
 	void rollbackInvitation(UUID userId);
 
 	/**
-	 * Re-triggers the identity provider's own invitation email for an existing PENDING
-	 * account (UF-IDU-03) - the same required actions, a new action-token email, no new
-	 * identity or {@code userId}. Per UF-IDU-01 Rules, the previously issued link is not
-	 * invalidated by this - an accepted limitation of Keycloak's action-token mechanism,
-	 * not something this application tracks or enforces.
+	 * Re-triggers the identity provider's own invitation email for an account whose
+	 * current invitation has gone stale
+	 * ({@link dev.onepieceapi.userservice.domain.AccountStatus#INVITATION_EXPIRED},
+	 * UF-IDU-03) - the same required actions, a new action-token email, no new identity
+	 * or {@code userId}. Gated on the account already being expired, not merely PENDING,
+	 * so this never runs while a previously issued link is still valid - see
+	 * {@code docs/adr/0004-invitation-expiry-gating.md}.
 	 * @throws UserNotFoundException if no account exists for {@code userId}
-	 * @throws InvitationNotPendingException if the account already has a usable
-	 * credential
+	 * @throws InvitationNotResendableException if the account is not currently
+	 * {@code INVITATION_EXPIRED}
 	 */
 	User resendInvitation(UUID userId);
 
