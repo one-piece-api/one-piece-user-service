@@ -154,7 +154,8 @@ class AdminUserControllerTest {
 	void resendingForAnUnknownUserReturnsNotFound() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
-		when(this.adminUserInvitationService.resend(targetId, luffy)).thenThrow(new UserNotFoundException(targetId));
+		var notFound = new UserNotFoundException(targetId);
+		when(this.adminUserInvitationService.resend(targetId, luffy)).thenThrow(notFound);
 
 		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(luffy, "ADMIN"));
 		this.mockMvc.perform(request).andExpect(status().isNotFound());
@@ -174,8 +175,9 @@ class AdminUserControllerTest {
 	@Test
 	void aNonAdminCannotResendAnInvitation() throws Exception {
 		var nami = nami();
+		var targetId = UUID.randomUUID();
 
-		var request = post("/admin/users/" + UUID.randomUUID() + "/resend-invitation").with(asUser(nami, "EDITOR"));
+		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(nami, "EDITOR"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 

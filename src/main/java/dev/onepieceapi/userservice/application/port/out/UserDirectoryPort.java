@@ -50,7 +50,8 @@ public interface UserDirectoryPort {
 	 * invalidated by this - an accepted limitation of Keycloak's action-token mechanism,
 	 * not something this application tracks or enforces.
 	 * @throws UserNotFoundException if no account exists for {@code userId}
-	 * @throws InvitationNotPendingException if the account already has a usable credential
+	 * @throws InvitationNotPendingException if the account already has a usable
+	 * credential
 	 */
 	User resendInvitation(UUID userId);
 

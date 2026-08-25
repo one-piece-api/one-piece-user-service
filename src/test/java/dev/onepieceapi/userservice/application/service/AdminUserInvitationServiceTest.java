@@ -139,7 +139,8 @@ class AdminUserInvitationServiceTest {
 
 	@Test
 	void doesNotRecordAnAuditEventWhenResendFails() {
-		when(this.userDirectoryPort.resendInvitation(INVITED_ID)).thenThrow(new RuntimeException("Keycloak unreachable"));
+		when(this.userDirectoryPort.resendInvitation(INVITED_ID))
+			.thenThrow(new RuntimeException("Keycloak unreachable"));
 
 		assertThatThrownBy(() -> this.adminUserInvitationService.resend(INVITED_ID, ADMIN))
 			.isInstanceOf(RuntimeException.class);

@@ -45,12 +45,12 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	/**
 	 * Set on invite (UF-IDU-01) and re-sent as-is on resend (UF-IDU-03), so the invited
 	 * user completes all three on Keycloak's own hosted pages before the account becomes
-	 * usable: sets a password, chooses the {@code username} (UF-IDU-02 - Keycloak's native
-	 * "Update Profile" screen, username editable by the account owner), and confirms the
-	 * email address (UF-IDU-04). See {@link KeycloakUserMapper} for how account status is
-	 * derived from these, and {@code KeycloakInvitationProperties} for where the browser is
-	 * sent once all three are done. Keycloak itself decides the on-screen order, not this
-	 * list.
+	 * usable: sets a password, chooses the {@code username} (UF-IDU-02 - Keycloak's
+	 * native "Update Profile" screen, username editable by the account owner), and
+	 * confirms the email address (UF-IDU-04). See {@link KeycloakUserMapper} for how
+	 * account status is derived from these, and {@code KeycloakInvitationProperties} for
+	 * where the browser is sent once all three are done. Keycloak itself decides the
+	 * on-screen order, not this list.
 	 */
 	private static final List<String> INVITATION_REQUIRED_ACTIONS = List.of("UPDATE_PASSWORD", "UPDATE_PROFILE",
 			"VERIFY_EMAIL");
