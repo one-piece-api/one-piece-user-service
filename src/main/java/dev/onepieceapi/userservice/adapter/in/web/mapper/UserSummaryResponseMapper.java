@@ -10,6 +10,7 @@ public class UserSummaryResponseMapper {
 	public UserSummaryResponse toResponse(User user) {
 		return UserSummaryResponse.builder()
 			.userId(user.userId())
+			.username(user.username())
 			.email(user.email())
 			.status(user.status())
 			.roles(user.roles())

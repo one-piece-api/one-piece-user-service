@@ -21,7 +21,8 @@ class KeycloakUserMapper {
 
 	User toUser(UserRepresentation user, List<String> realmRoles) {
 		UUID userId = UUID.fromString(user.getId());
-		return new User(userId, user.getEmail(), statusOf(user), realmRoles, createdAtOf(user));
+		AccountStatus status = statusOf(user);
+		return new User(userId, user.getUsername(), user.getEmail(), status, realmRoles, createdAtOf(user));
 	}
 
 	private AccountStatus statusOf(UserRepresentation user) {

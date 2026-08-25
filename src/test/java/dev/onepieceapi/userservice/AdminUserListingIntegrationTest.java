@@ -91,10 +91,25 @@ class AdminUserListingIntegrationTest {
 			.expectStatus()
 			.isOk()
 			.expectBody(String.class)
-			.consumeWith(result -> assertThat(result.getResponseBody()).contains("luffy@onepiece.local")
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"username\":\"luffy\"")
+				.contains("luffy@onepiece.local")
 				.contains("\"status\":\"ACTIVE\"")
 				.contains("\"ADMIN\"")
 				.doesNotContain("default-roles"));
+	}
+
+	@Test
+	void meReturnsTheCallersUsernameFromTheTokensPreferredUsernameClaim() {
+		this.restTestClient.get()
+			.uri("/me")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"username\":\"luffy\"")
+				.contains("\"email\":\"luffy@onepiece.local\"")
+				.contains("\"ADMIN\""));
 	}
 
 	@Test

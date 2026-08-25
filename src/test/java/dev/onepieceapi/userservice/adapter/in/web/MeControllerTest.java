@@ -27,9 +27,10 @@ class MeControllerTest {
 	private MockMvc mockMvc;
 
 	@Test
-	void returnsEmailAndRolesFromTheTokensRealmRoles() throws Exception {
+	void returnsUsernameEmailAndRolesFromTheTokensClaims() throws Exception {
 		var roles = List.of("ADMIN", "EDITOR");
-		var luffy = new User(UUID.randomUUID(), "luffy@onepiece.local", AccountStatus.ACTIVE, roles, null);
+		UUID userId = UUID.randomUUID();
+		var luffy = new User(userId, "luffy", "luffy@onepiece.local", AccountStatus.ACTIVE, roles, null);
 		var jwt = Jwt.withTokenValue("token")
 			.header("alg", "none")
 			.issuedAt(Instant.EPOCH)
@@ -41,7 +42,7 @@ class MeControllerTest {
 		var asLuffy = authentication(new ApplicationUserAuthenticationToken(jwt, luffy, authorities));
 
 		this.mockMvc.perform(get("/me").with(asLuffy)).andExpect(status().isOk()).andExpect(content().json("""
-				{"email": "luffy@onepiece.local", "roles": ["ADMIN", "EDITOR"]}
+				{"username": "luffy", "email": "luffy@onepiece.local", "roles": ["ADMIN", "EDITOR"]}
 				"""));
 	}
 

@@ -20,6 +20,8 @@ class ApplicationUserJwtAuthenticationConverterTest {
 
 	private static final UUID USER_ID = UUID.fromString("446fbe79-5cc4-458d-925d-9934334b6dcf");
 
+	private static final String USERNAME = "luffy";
+
 	private static final String EMAIL = "luffy@onepiece.local";
 
 	private ApplicationUserJwtAuthenticationConverter converter;
@@ -31,32 +33,42 @@ class ApplicationUserJwtAuthenticationConverterTest {
 
 	@Test
 	void resolvesTheApplicationUserAndAuthoritiesFromTheTokensOwnClaims() {
-		Jwt jwt = jwtWithSubjectEmailAndRoles(USER_ID, EMAIL, "ADMIN", "EDITOR");
+		Jwt jwt = jwtWithSubjectUsernameEmailAndRoles(USER_ID, USERNAME, EMAIL, "ADMIN", "EDITOR");
 		var authentication = this.converter.convert(jwt);
 
 		assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
 			.containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_EDITOR");
-		assertThat(((ApplicationUserAuthenticationToken) authentication).getUser())
-			.isEqualTo(new User(USER_ID, EMAIL, AccountStatus.ACTIVE, List.of("ADMIN", "EDITOR"), null));
+		var roles = List.of("ADMIN", "EDITOR");
+		var expected = new User(USER_ID, USERNAME, EMAIL, AccountStatus.ACTIVE, roles, null);
+		assertThat(((ApplicationUserAuthenticationToken) authentication).getUser()).isEqualTo(expected);
 	}
 
 	@Test
 	void rejectsATokenMissingTheSubjectClaim() {
-		Jwt jwt = jwtWithClaims(Map.of("email", EMAIL));
+		Jwt jwt = jwtWithClaims(Map.of("preferred_username", USERNAME, "email", EMAIL));
+
+		assertThatThrownBy(() -> this.converter.convert(jwt)).isInstanceOf(InvalidBearerTokenException.class);
+	}
+
+	@Test
+	void rejectsATokenMissingTheUsernameClaim() {
+		Jwt jwt = jwtWithClaims(Map.of("sub", USER_ID.toString(), "email", EMAIL));
 
 		assertThatThrownBy(() -> this.converter.convert(jwt)).isInstanceOf(InvalidBearerTokenException.class);
 	}
 
 	@Test
 	void rejectsATokenMissingTheEmailClaim() {
-		Jwt jwt = jwtWithClaims(Map.of("sub", USER_ID.toString()));
+		Jwt jwt = jwtWithClaims(Map.of("sub", USER_ID.toString(), "preferred_username", USERNAME));
 
 		assertThatThrownBy(() -> this.converter.convert(jwt)).isInstanceOf(InvalidBearerTokenException.class);
 	}
 
-	private static Jwt jwtWithSubjectEmailAndRoles(UUID userId, String email, String... roles) {
+	private static Jwt jwtWithSubjectUsernameEmailAndRoles(UUID userId, String username, String email,
+			String... roles) {
 		Map<String, Object> realmAccess = Map.of("roles", List.of(roles));
-		return jwtWithClaims(Map.of("sub", userId.toString(), "email", email, "realm_access", realmAccess));
+		return jwtWithClaims(Map.of("sub", userId.toString(), "preferred_username", username, "email", email,
+				"realm_access", realmAccess));
 	}
 
 	private static Jwt jwtWithClaims(Map<String, Object> claims) {

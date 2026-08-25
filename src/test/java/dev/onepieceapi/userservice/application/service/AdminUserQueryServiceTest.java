@@ -23,6 +23,8 @@ class AdminUserQueryServiceTest {
 
 	private static final UUID LUFFY_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
+	private static final String LUFFY_USERNAME = "luffy";
+
 	private static final String LUFFY_EMAIL = "luffy@onepiece.local";
 
 	@Mock
@@ -38,7 +40,8 @@ class AdminUserQueryServiceTest {
 	@Test
 	void listsTheAccountsReturnedByTheIdentityDirectory() {
 		Pageable pageable = PageRequest.of(0, 20);
-		var luffy = new User(LUFFY_ID, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of("ADMIN"), null);
+		var roles = List.of("ADMIN");
+		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, roles, null);
 		when(this.userDirectoryPort.findUsers(0, 20)).thenReturn(List.of(luffy));
 		when(this.userDirectoryPort.countUsers()).thenReturn(1L);
 
@@ -50,7 +53,7 @@ class AdminUserQueryServiceTest {
 	@Test
 	void reportsTheRealmsTotalUserCountRatherThanThisPagesSize() {
 		Pageable pageable = PageRequest.of(0, 1);
-		var luffy = new User(LUFFY_ID, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of(), null);
+		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of(), null);
 		when(this.userDirectoryPort.findUsers(0, 1)).thenReturn(List.of(luffy));
 		when(this.userDirectoryPort.countUsers()).thenReturn(37L);
 

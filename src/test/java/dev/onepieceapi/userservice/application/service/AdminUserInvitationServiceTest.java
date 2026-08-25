@@ -36,12 +36,14 @@ class AdminUserInvitationServiceTest {
 
 	private static final Instant NOW = Instant.parse("2026-08-23T10:00:00Z");
 
-	private static final User ADMIN = new User(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+	private static final User ADMIN = new User(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "luffy",
 			"luffy@onepiece.local", AccountStatus.ACTIVE, List.of("ADMIN"), null);
 
 	private static final UUID INVITED_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
 	private static final String INVITED_EMAIL = "usopp@onepiece.local";
+
+	private static final List<String> INVITED_ROLES = List.of("EDITOR");
 
 	@Mock
 	private UserDirectoryPort userDirectoryPort;
@@ -64,7 +66,7 @@ class AdminUserInvitationServiceTest {
 	@Test
 	void invitesTheUserThroughTheIdentityDirectoryAndRecordsWhoDidIt() {
 		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
-		var invited = new User(INVITED_ID, INVITED_EMAIL, AccountStatus.PENDING, List.of("EDITOR"), NOW);
+		var invited = pendingInvitedUser();
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 
 		User result = this.adminUserInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
@@ -96,7 +98,7 @@ class AdminUserInvitationServiceTest {
 	@Test
 	void rollsBackTheInvitationWhenTheAuditWriteFails() {
 		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
-		var invited = new User(INVITED_ID, INVITED_EMAIL, AccountStatus.PENDING, List.of("EDITOR"), NOW);
+		var invited = pendingInvitedUser();
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 		var auditFailure = new RuntimeException("Postgres unreachable");
 		doThrow(auditFailure).when(this.auditLogPort).record(any());
@@ -110,7 +112,7 @@ class AdminUserInvitationServiceTest {
 	@Test
 	void stillPropagatesTheOriginalFailureWhenRollingBackItselfFails() {
 		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
-		var invited = new User(INVITED_ID, INVITED_EMAIL, AccountStatus.PENDING, List.of("EDITOR"), NOW);
+		var invited = pendingInvitedUser();
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 		var auditFailure = new RuntimeException("Postgres unreachable");
 		doThrow(auditFailure).when(this.auditLogPort).record(any());
@@ -123,7 +125,7 @@ class AdminUserInvitationServiceTest {
 
 	@Test
 	void resendsTheInvitationThroughTheIdentityDirectoryAndRecordsWhoDidIt() {
-		var pending = new User(INVITED_ID, INVITED_EMAIL, AccountStatus.PENDING, List.of("EDITOR"), NOW);
+		var pending = pendingInvitedUser();
 		when(this.userDirectoryPort.resendInvitation(INVITED_ID)).thenReturn(pending);
 
 		User result = this.adminUserInvitationService.resend(INVITED_ID, ADMIN);
@@ -146,6 +148,10 @@ class AdminUserInvitationServiceTest {
 			.isInstanceOf(RuntimeException.class);
 
 		verifyNoInteractions(this.auditLogPort);
+	}
+
+	private static User pendingInvitedUser() {
+		return new User(INVITED_ID, INVITED_EMAIL, INVITED_EMAIL, AccountStatus.PENDING, INVITED_ROLES, NOW);
 	}
 
 }

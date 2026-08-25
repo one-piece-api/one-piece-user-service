@@ -8,6 +8,6 @@ import java.util.List;
 import java.util.UUID;
 
 @Builder
-public record UserSummaryResponse(UUID userId, String email, AccountStatus status, List<String> roles,
+public record UserSummaryResponse(UUID userId, String username, String email, AccountStatus status, List<String> roles,
 		Instant createdAt) {
 }

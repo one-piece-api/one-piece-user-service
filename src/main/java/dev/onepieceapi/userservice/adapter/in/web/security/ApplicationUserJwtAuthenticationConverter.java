@@ -16,11 +16,16 @@ import java.util.stream.Collectors;
 
 /**
  * Resolves a validated JWT to the corresponding {@link User}, built entirely from the
- * token's own claims - the standard {@code sub} claim, {@code email} and
- * {@code realm_access.roles} - with no local lookup: Keycloak is the sole source of
- * identity (see {@link User}), so any well-formed, validly-signed token for this realm
- * resolves to a user. {@code sub} is Keycloak's own account id, always present on an OIDC
- * token by specification, so no custom protocol mapper/attribute is needed to carry it. A
+ * token's own claims - the standard {@code sub} claim, {@code preferred_username},
+ * {@code email} and {@code realm_access.roles} - with no local lookup: Keycloak is the
+ * sole source of identity (see {@link User}), so any well-formed, validly-signed token
+ * for this realm resolves to a user. {@code sub} is Keycloak's own account id, always
+ * present on an OIDC token by specification, so no custom protocol mapper/attribute is
+ * needed to carry it - unlike {@code preferred_username}, which this realm's custom
+ * {@code profile} client scope must explicitly map from the account's {@code username}
+ * attribute (see {@code onepiece-infrastructure/keycloak/realm-onepiece.json}), the
+ * user-chosen handle from UPDATE_PROFILE at activation (UF-IDU-02) and the identifier the
+ * UI displays in place of email (§2 of application-user-identity-management.md). A
  * revocation (UF-IDU-13) takes effect at the identity provider immediately but only
  * reaches an already-issued access token once that token's own short lifetime expires and
  * refresh fails: an accepted, bounded window, not a local per-request check - so
@@ -38,6 +43,8 @@ import java.util.stream.Collectors;
 @Component
 class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
+	private static final String USERNAME_CLAIM = "preferred_username";
+
 	private static final String EMAIL_CLAIM = "email";
 
 	private static final String REALM_ACCESS_CLAIM = "realm_access";
@@ -47,10 +54,11 @@ class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, Abstra
 	@Override
 	public AbstractAuthenticationToken convert(Jwt jwt) {
 		UUID userId = JwtUtils.getRequiredUuidClaim(jwt, JwtClaimNames.SUB);
+		String username = JwtUtils.getRequiredStringClaim(jwt, USERNAME_CLAIM);
 		String email = JwtUtils.getRequiredStringClaim(jwt, EMAIL_CLAIM);
 		List<String> roles = JwtUtils.getNestedStringListClaim(jwt, REALM_ACCESS_CLAIM, REALM_ROLES_CLAIM);
 
-		User user = new User(userId, email, AccountStatus.ACTIVE, roles, null);
+		User user = new User(userId, username, email, AccountStatus.ACTIVE, roles, null);
 
 		return new ApplicationUserAuthenticationToken(jwt, user, realmRoleAuthorities(roles));
 	}

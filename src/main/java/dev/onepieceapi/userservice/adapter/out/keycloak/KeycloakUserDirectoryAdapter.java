@@ -117,8 +117,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		if (!isInvitationExpired(pendingUser.userId())) {
 			return pendingUser;
 		}
-		return new User(pendingUser.userId(), pendingUser.email(), AccountStatus.INVITATION_EXPIRED,
-				pendingUser.roles(), pendingUser.createdAt());
+		return new User(pendingUser.userId(), pendingUser.username(), pendingUser.email(),
+				AccountStatus.INVITATION_EXPIRED, pendingUser.roles(), pendingUser.createdAt());
 	}
 
 	private boolean isInvitationExpired(UUID userId) {
@@ -194,7 +194,10 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		}
 
 		UUID userId = UUID.fromString(keycloakId);
-		return new User(userId, email, AccountStatus.PENDING, roleNames(roles), Instant.now(this.clock));
+		// The account's username is still the email placeholder set in
+		// createUnactivatedUser -
+		// the real, user-chosen one doesn't exist until activation (UF-IDU-02).
+		return new User(userId, email, email, AccountStatus.PENDING, roleNames(roles), Instant.now(this.clock));
 	}
 
 	private String createUnactivatedUser(UsersResource users, String email) {
@@ -266,7 +269,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		// A fresh link was just issued - the account is PENDING again, not still expired,
 		// so the caller (and the admin listing it feeds, once reloaded) reflects that
 		// immediately rather than the pre-resend status.
-		return new User(user.userId(), user.email(), AccountStatus.PENDING, user.roles(), user.createdAt());
+		return new User(user.userId(), user.username(), user.email(), AccountStatus.PENDING, user.roles(),
+				user.createdAt());
 	}
 
 	private UserRepresentation requireRepresentation(UsersResource users, UUID userId) {

@@ -11,7 +11,7 @@ class MeController {
 
 	@GetMapping("/me")
 	MeResponse me(@AuthenticationPrincipal User user) {
-		return new MeResponse(user.email(), user.roles());
+		return new MeResponse(user.username(), user.email(), user.roles());
 	}
 
 }

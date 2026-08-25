@@ -23,5 +23,6 @@ import java.util.UUID;
  * the account's live state.</li>
  * </ul>
  */
-public record User(UUID userId, String email, AccountStatus status, List<String> roles, Instant createdAt) {
+public record User(UUID userId, String username, String email, AccountStatus status, List<String> roles,
+		Instant createdAt) {
 }

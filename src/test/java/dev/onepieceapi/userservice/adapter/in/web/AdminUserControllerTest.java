@@ -66,7 +66,7 @@ class AdminUserControllerTest {
 		var luffy = luffy();
 		List<String> roles = List.of("ADMIN");
 		AccountStatus status = AccountStatus.ACTIVE;
-		var account = new User(luffy.userId(), luffy.email(), status, roles, Instant.EPOCH);
+		var account = new User(luffy.userId(), luffy.username(), luffy.email(), status, roles, Instant.EPOCH);
 		when(this.adminUserQueryService.list(any())).thenReturn(new PageImpl<>(List.of(account)));
 
 		var request = get("/admin/users").with(asUser(luffy, "ADMIN"));
@@ -85,8 +85,9 @@ class AdminUserControllerTest {
 	void anAdminCanInviteAUser() throws Exception {
 		var luffy = luffy();
 		List<String> invitedRoles = List.of("EDITOR");
-		var invited = new User(UUID.randomUUID(), "usopp@onepiece.local", AccountStatus.PENDING, invitedRoles,
-				Instant.EPOCH);
+		UUID invitedId = UUID.randomUUID();
+		var invited = new User(invitedId, "usopp@onepiece.local", "usopp@onepiece.local", AccountStatus.PENDING,
+				invitedRoles, Instant.EPOCH);
 		when(this.adminUserInvitationService.invite("usopp@onepiece.local", Set.of(RealmRole.EDITOR), luffy))
 			.thenReturn(invited);
 
@@ -142,8 +143,8 @@ class AdminUserControllerTest {
 	void anAdminCanResendAnInvitation() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
-		var target = new User(targetId, "usopp@onepiece.local", AccountStatus.PENDING, List.of("EDITOR"),
-				Instant.EPOCH);
+		var target = new User(targetId, "usopp@onepiece.local", "usopp@onepiece.local", AccountStatus.PENDING,
+				List.of("EDITOR"), Instant.EPOCH);
 		when(this.adminUserInvitationService.resend(targetId, luffy)).thenReturn(target);
 
 		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(luffy, "ADMIN"));
@@ -185,12 +186,12 @@ class AdminUserControllerTest {
 
 	private static User luffy() {
 		UUID userId = UUID.randomUUID();
-		return new User(userId, "luffy@onepiece.local", AccountStatus.ACTIVE, List.of("ADMIN"), null);
+		return new User(userId, "luffy", "luffy@onepiece.local", AccountStatus.ACTIVE, List.of("ADMIN"), null);
 	}
 
 	private static User nami() {
 		UUID userId = UUID.randomUUID();
-		return new User(userId, "nami@onepiece.local", AccountStatus.ACTIVE, List.of("EDITOR"), null);
+		return new User(userId, "nami", "nami@onepiece.local", AccountStatus.ACTIVE, List.of("EDITOR"), null);
 	}
 
 	private static RequestPostProcessor asUser(User user, String... roles) {
