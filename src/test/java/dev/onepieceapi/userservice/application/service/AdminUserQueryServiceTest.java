@@ -65,7 +65,8 @@ class AdminUserQueryServiceTest {
 
 	@Test
 	void getsASingleUserThroughTheIdentityDirectory() {
-		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of("ADMIN"), null);
+		List<String> roles = List.of("ADMIN");
+		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, roles, null);
 		when(this.userDirectoryPort.findUser(LUFFY_ID)).thenReturn(luffy);
 
 		User result = this.adminUserQueryService.getUser(LUFFY_ID);

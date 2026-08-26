@@ -12,8 +12,11 @@ import java.util.UUID;
 public class LastRoleException extends ConflictException {
 
 	public LastRoleException(UUID userId, RealmRole role) {
-		super(UserErrorCode.LAST_ROLE,
-				"Cannot remove role " + role + " from " + userId + " - at least one role must remain assigned");
+		super(UserErrorCode.LAST_ROLE, message(userId, role));
+	}
+
+	private static String message(UUID userId, RealmRole role) {
+		return "Cannot remove " + role + " from " + userId + " - at least one role must remain assigned";
 	}
 
 }
