@@ -288,7 +288,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		}
 
 		List<String> updatedRoles = Stream.concat(user.roles().stream(), Stream.of(role.name())).toList();
-		return new User(user.userId(), user.username(), user.email(), user.status(), updatedRoles, user.createdAt());
+		return withRoles(user, updatedRoles);
 	}
 
 	@Override
@@ -299,7 +299,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			return user;
 		}
 		// Checked in this order deliberately: when ADMIN is this account's only role (the
-		// common case for a bootstrap admin), both rules technically apply - reporting the
+		// common case for a bootstrap admin), both rules technically apply - reporting
+		// the
 		// ADMIN-specific one first (UF-IDU-16) is more actionable than the generic
 		// "at least one role must remain" (UF-IDU-15), since re-adding some other role
 		// first wouldn't actually fix the real problem here.
@@ -315,19 +316,78 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			users.get(userId.toString()).roles().realmLevel().remove(List.of(representation));
 		}
 		catch (RuntimeException ex) {
-			throw new KeycloakCommunicationException("Failed to revoke role " + role + " from " + userId, ex);
+			String message = "Failed to revoke role " + role + " from " + userId;
+			throw new KeycloakCommunicationException(message, ex);
 		}
 
 		List<String> remainingRoles = user.roles().stream().filter(name -> !name.equals(role.name())).toList();
-		return new User(user.userId(), user.username(), user.email(), user.status(), remainingRoles,
+		return withRoles(user, remainingRoles);
+	}
+
+	private static User withRoles(User user, List<String> roles) {
+		return new User(user.userId(), user.username(), user.email(), user.status(), roles, user.createdAt());
+	}
+
+	@Override
+	public User revokeAccess(UUID userId) {
+		UsersResource users = getRealm().users();
+		User user = loadUser(users, userId);
+		if (user.status() == AccountStatus.DISABLED) {
+			return user;
+		}
+		if (user.roles().contains(RealmRole.ADMIN.name()) && !hasAnotherAdmin(userId)) {
+			throw new LastAdministratorException(userId);
+		}
+
+		try {
+			UserResource userResource = users.get(userId.toString());
+			setEnabled(userResource, false);
+			// Disabling alone leaves already-issued sessions/refresh tokens usable until
+			// they naturally expire - UF-IDU-13 requires them invalidated immediately,
+			// not
+			// just blocked from renewing.
+			userResource.logout();
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to revoke access for " + userId, ex);
+		}
+
+		return new User(user.userId(), user.username(), user.email(), AccountStatus.DISABLED, user.roles(),
 				user.createdAt());
+	}
+
+	@Override
+	public User reactivate(UUID userId) {
+		UsersResource users = getRealm().users();
+		User user = loadUser(users, userId);
+		if (user.status() != AccountStatus.DISABLED) {
+			return user;
+		}
+
+		try {
+			setEnabled(users.get(userId.toString()), true);
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to reactivate " + userId, ex);
+		}
+		// Re-enabling doesn't by itself tell us whether the account was ACTIVE or still
+		// mid-invitation (PENDING/INVITATION_EXPIRED) before it was disabled - reload
+		// rather than assume ACTIVE, so KeycloakUserMapper/the expiry check re-derive the
+		// correct status from the account's actual requiredActions.
+		return loadUser(users, userId);
+	}
+
+	private void setEnabled(UserResource userResource, boolean enabled) {
+		UserRepresentation representation = userResource.toRepresentation();
+		representation.setEnabled(enabled);
+		userResource.update(representation);
 	}
 
 	/**
 	 * UF-IDU-16: fetches at most two ADMIN-role members (never the whole role membership,
-	 * regardless of how many admins exist) and checks whether one of them is someone other
-	 * than {@code excludedUserId} - the exact question a revoke needs answered, nothing
-	 * more.
+	 * regardless of how many admins exist) and checks whether one of them is someone
+	 * other than {@code excludedUserId} - the exact question a revoke needs answered,
+	 * nothing more.
 	 */
 	private boolean hasAnotherAdmin(UUID excludedUserId) {
 		List<UserRepresentation> admins = getRealm().roles().get(RealmRole.ADMIN.name()).getUserMembers(0, 2);

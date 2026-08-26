@@ -4,6 +4,7 @@ import dev.onepieceapi.userservice.adapter.in.web.dto.InviteUserRequest;
 import dev.onepieceapi.userservice.adapter.in.web.dto.PageResponse;
 import dev.onepieceapi.userservice.adapter.in.web.dto.UserSummaryResponse;
 import dev.onepieceapi.userservice.adapter.in.web.mapper.UserSummaryResponseMapper;
+import dev.onepieceapi.userservice.application.service.AdminUserAccessService;
 import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
 import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
 import dev.onepieceapi.userservice.application.service.AdminUserRoleService;
@@ -29,9 +30,9 @@ import java.util.UUID;
 
 /**
  * The user listing and single-user lookup from UF-IDU-17, the invite endpoint from
- * UF-IDU-01, the resend endpoint from UF-IDU-03, and the role assign/revoke endpoints from
- * UF-IDU-15/16. ADMIN-only access is enforced in {@code SecurityConfig} ("/admin/**"), not
- * here.
+ * UF-IDU-01, the resend endpoint from UF-IDU-03, the role assign/revoke endpoints from
+ * UF-IDU-15/16, and the revoke-access/reactivate endpoints from UF-IDU-13/14. ADMIN-only
+ * access is enforced in {@code SecurityConfig} ("/admin/**"), not here.
  */
 @RestController
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -42,6 +43,8 @@ class AdminUserController {
 	private final AdminUserInvitationService adminUserInvitationService;
 
 	private final AdminUserRoleService adminUserRoleService;
+
+	private final AdminUserAccessService adminUserAccessService;
 
 	@GetMapping("/admin/users")
 	PageResponse<UserSummaryResponse> listUsers(Pageable pageable) {
@@ -79,6 +82,18 @@ class AdminUserController {
 	UserSummaryResponse revokeRole(@PathVariable UUID userId, @PathVariable RealmRole role,
 			@AuthenticationPrincipal User user) {
 		var target = this.adminUserRoleService.revokeRole(userId, role, user);
+		return UserSummaryResponseMapper.toResponse(target);
+	}
+
+	@PostMapping("/admin/users/{userId}/revoke-access")
+	UserSummaryResponse revokeAccess(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
+		var target = this.adminUserAccessService.revokeAccess(userId, user);
+		return UserSummaryResponseMapper.toResponse(target);
+	}
+
+	@PostMapping("/admin/users/{userId}/reactivate")
+	UserSummaryResponse reactivate(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
+		var target = this.adminUserAccessService.reactivate(userId, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 

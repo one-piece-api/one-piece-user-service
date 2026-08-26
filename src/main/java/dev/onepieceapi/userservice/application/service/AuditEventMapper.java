@@ -16,23 +16,32 @@ import java.time.Instant;
 class AuditEventMapper {
 
 	AuditEvent userInvited(User actor, User invited, Instant occurredAt) {
-		return new AuditEvent(AuditAction.USER_INVITED, actor.userId(), actor.email(), invited.userId(),
-				invited.email(), occurredAt);
+		return of(AuditAction.USER_INVITED, actor, invited, occurredAt);
 	}
 
 	AuditEvent invitationResent(User actor, User target, Instant occurredAt) {
-		return new AuditEvent(AuditAction.INVITATION_RESENT, actor.userId(), actor.email(), target.userId(),
-				target.email(), occurredAt);
+		return of(AuditAction.INVITATION_RESENT, actor, target, occurredAt);
 	}
 
 	AuditEvent roleAssigned(User actor, User target, Instant occurredAt) {
-		return new AuditEvent(AuditAction.ROLE_ASSIGNED, actor.userId(), actor.email(), target.userId(),
-				target.email(), occurredAt);
+		return of(AuditAction.ROLE_ASSIGNED, actor, target, occurredAt);
 	}
 
 	AuditEvent roleRevoked(User actor, User target, Instant occurredAt) {
-		return new AuditEvent(AuditAction.ROLE_REVOKED, actor.userId(), actor.email(), target.userId(),
-				target.email(), occurredAt);
+		return of(AuditAction.ROLE_REVOKED, actor, target, occurredAt);
+	}
+
+	AuditEvent accessRevoked(User actor, User target, Instant occurredAt) {
+		return of(AuditAction.ACCESS_REVOKED, actor, target, occurredAt);
+	}
+
+	AuditEvent accessReactivated(User actor, User target, Instant occurredAt) {
+		return of(AuditAction.ACCESS_REACTIVATED, actor, target, occurredAt);
+	}
+
+	private static AuditEvent of(AuditAction action, User actor, User target, Instant occurredAt) {
+		var actorId = actor.userId();
+		return new AuditEvent(action, actorId, actor.email(), target.userId(), target.email(), occurredAt);
 	}
 
 }

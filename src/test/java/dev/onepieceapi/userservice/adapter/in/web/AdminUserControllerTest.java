@@ -8,6 +8,7 @@ import dev.onepieceapi.userservice.application.exception.InvitationNotResendable
 import dev.onepieceapi.userservice.application.exception.LastAdministratorException;
 import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
+import dev.onepieceapi.userservice.application.service.AdminUserAccessService;
 import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
 import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
 import dev.onepieceapi.userservice.application.service.AdminUserRoleService;
@@ -68,6 +69,9 @@ class AdminUserControllerTest {
 
 	@MockitoBean
 	private AdminUserRoleService adminUserRoleService;
+
+	@MockitoBean
+	private AdminUserAccessService adminUserAccessService;
 
 	@Test
 	void anAdminCanListUsers() throws Exception {
@@ -244,8 +248,9 @@ class AdminUserControllerTest {
 	void anAdminCanRevokeARole() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
-		var updated = new User(targetId, "usopp", "usopp@onepiece.local", AccountStatus.ACTIVE, List.of("EDITOR"),
-				Instant.EPOCH);
+		List<String> roles = List.of("EDITOR");
+		String email = "usopp@onepiece.local";
+		var updated = new User(targetId, "usopp", email, AccountStatus.ACTIVE, roles, Instant.EPOCH);
 		when(this.adminUserRoleService.revokeRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
 
 		var request = delete("/admin/users/" + targetId + "/roles/ADMIN").with(asUser(luffy, "ADMIN"));
@@ -283,6 +288,84 @@ class AdminUserControllerTest {
 		var targetId = UUID.randomUUID();
 
 		var request = delete("/admin/users/" + targetId + "/roles/ADMIN").with(asUser(nami, "EDITOR"));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void anAdminCanRevokeAccess() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		List<String> roles = List.of("EDITOR");
+		String email = "usopp@onepiece.local";
+		var updated = new User(targetId, "usopp", email, AccountStatus.DISABLED, roles, Instant.EPOCH);
+		when(this.adminUserAccessService.revokeAccess(targetId, luffy)).thenReturn(updated);
+
+		var request = post("/admin/users/" + targetId + "/revoke-access").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void revokingAccessFromTheLastAdministratorReturnsConflict() throws Exception {
+		var luffy = luffy();
+		when(this.adminUserAccessService.revokeAccess(luffy.userId(), luffy))
+			.thenThrow(new LastAdministratorException(luffy.userId()));
+
+		var request = post("/admin/users/" + luffy.userId() + "/revoke-access").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request)
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.errorCode").value("USER_LAST_ADMINISTRATOR"));
+	}
+
+	@Test
+	void revokingAccessForAnUnknownUserReturnsNotFound() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		var notFound = new UserNotFoundException(targetId);
+		when(this.adminUserAccessService.revokeAccess(targetId, luffy)).thenThrow(notFound);
+
+		var request = post("/admin/users/" + targetId + "/revoke-access").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void aNonAdminCannotRevokeAccess() throws Exception {
+		var nami = nami();
+		var targetId = UUID.randomUUID();
+
+		var request = post("/admin/users/" + targetId + "/revoke-access").with(asUser(nami, "EDITOR"));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void anAdminCanReactivate() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		List<String> roles = List.of("EDITOR");
+		String email = "usopp@onepiece.local";
+		var updated = new User(targetId, "usopp", email, AccountStatus.ACTIVE, roles, Instant.EPOCH);
+		when(this.adminUserAccessService.reactivate(targetId, luffy)).thenReturn(updated);
+
+		var request = post("/admin/users/" + targetId + "/reactivate").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void reactivatingAnUnknownUserReturnsNotFound() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		var notFound = new UserNotFoundException(targetId);
+		when(this.adminUserAccessService.reactivate(targetId, luffy)).thenThrow(notFound);
+
+		var request = post("/admin/users/" + targetId + "/reactivate").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void aNonAdminCannotReactivate() throws Exception {
+		var nami = nami();
+		var targetId = UUID.randomUUID();
+
+		var request = post("/admin/users/" + targetId + "/reactivate").with(asUser(nami, "EDITOR"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 

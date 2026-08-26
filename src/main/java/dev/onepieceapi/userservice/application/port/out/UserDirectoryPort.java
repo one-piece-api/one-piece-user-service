@@ -70,8 +70,8 @@ public interface UserDirectoryPort {
 	User assignRole(UUID userId, RealmRole role);
 
 	/**
-	 * Revokes {@code role} from {@code userId} (UF-IDU-15). Idempotent: a role the account
-	 * does not currently have is left as-is, not an error.
+	 * Revokes {@code role} from {@code userId} (UF-IDU-15). Idempotent: a role the
+	 * account does not currently have is left as-is, not an error.
 	 * @throws UserNotFoundException if no account exists for {@code userId}
 	 * @throws dev.onepieceapi.userservice.application.exception.LastRoleException if this
 	 * would leave the account with no roles at all
@@ -79,5 +79,24 @@ public interface UserDirectoryPort {
 	 * if {@code role} is ADMIN and this account is the realm's last one
 	 */
 	User revokeRole(UUID userId, RealmRole role);
+
+	/**
+	 * Disables the identity-provider account and invalidates every active session/refresh
+	 * token for it (UF-IDU-13) - an access token issued before the call remains valid
+	 * until its own (short) expiry, per §12. Idempotent: an already-disabled account is
+	 * left as-is.
+	 * @throws UserNotFoundException if no account exists for {@code userId}
+	 * @throws dev.onepieceapi.userservice.application.exception.LastAdministratorException
+	 * if this account holds ADMIN and is the realm's last one (UF-IDU-16)
+	 */
+	User revokeAccess(UUID userId);
+
+	/**
+	 * Re-enables a disabled identity-provider account (UF-IDU-14). Idempotent: an account
+	 * that isn't currently disabled is left as-is. Sessions/tokens invalidated by a prior
+	 * {@link #revokeAccess} stay invalid - the user must authenticate again.
+	 * @throws UserNotFoundException if no account exists for {@code userId}
+	 */
+	User reactivate(UUID userId);
 
 }

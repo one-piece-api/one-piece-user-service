@@ -200,24 +200,27 @@ class AdminUserListingIntegrationTest {
 		String adminToken = tokenFor("luffy", "luffy-pass");
 		String zoroId = inviteAndGetUserId("zoro@onepiece.local", "EDITOR", adminToken);
 
-		this.restTestClient.put()
+		String afterGrant = this.restTestClient.put()
 			.uri("/admin/users/" + zoroId + "/roles/ADMIN")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
 			.isOk()
 			.expectBody(String.class)
-			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"EDITOR\"").contains("\"ADMIN\""));
+			.returnResult()
+			.getResponseBody();
+		assertThat(afterGrant).contains("\"EDITOR\"").contains("\"ADMIN\"");
 
-		this.restTestClient.delete()
+		String afterRevoke = this.restTestClient.delete()
 			.uri("/admin/users/" + zoroId + "/roles/ADMIN")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
 			.isOk()
 			.expectBody(String.class)
-			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"EDITOR\"")
-				.doesNotContain("\"ADMIN\""));
+			.returnResult()
+			.getResponseBody();
+		assertThat(afterRevoke).contains("\"EDITOR\"").doesNotContain("\"ADMIN\"");
 	}
 
 	@Test
@@ -225,15 +228,16 @@ class AdminUserListingIntegrationTest {
 		String adminToken = tokenFor("luffy", "luffy-pass");
 		String chopperId = inviteAndGetUserId("chopper@onepiece.local", "EDITOR", adminToken);
 
-		this.restTestClient.delete()
+		String body = this.restTestClient.delete()
 			.uri("/admin/users/" + chopperId + "/roles/EDITOR")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
 			.isEqualTo(409)
 			.expectBody(String.class)
-			.consumeWith(
-					result -> assertThat(result.getResponseBody()).contains("\"errorCode\":\"USER_LAST_ROLE\""));
+			.returnResult()
+			.getResponseBody();
+		assertThat(body).contains("\"errorCode\":\"USER_LAST_ROLE\"");
 	}
 
 	/**
@@ -254,6 +258,66 @@ class AdminUserListingIntegrationTest {
 			.expectBody(String.class)
 			.consumeWith(result -> assertThat(result.getResponseBody())
 				.contains("\"errorCode\":\"USER_LAST_ADMINISTRATOR\""));
+	}
+
+	@Test
+	void anAdminCanRevokeAndReactivateAUser() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+		String sanjiId = inviteAndGetUserId("sanji@onepiece.local", "EDITOR", adminToken);
+
+		String afterRevoke = this.restTestClient.post()
+			.uri("/admin/users/" + sanjiId + "/revoke-access")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		assertThat(afterRevoke).contains("\"status\":\"DISABLED\"");
+
+		String afterReactivate = this.restTestClient.post()
+			.uri("/admin/users/" + sanjiId + "/reactivate")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		assertThat(afterReactivate).contains("\"status\":\"PENDING\"");
+	}
+
+	/**
+	 * The fixture realm seeds exactly one ADMIN (luffy) - rejecting this leaves that
+	 * invariant intact for every other test in this class, so no cleanup is needed.
+	 */
+	@Test
+	void revokingAccessFromTheOnlyAdministratorIsRejected() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+		String luffyId = userIdOf("luffy", adminToken);
+
+		this.restTestClient.post()
+			.uri("/admin/users/" + luffyId + "/revoke-access")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody())
+				.contains("\"errorCode\":\"USER_LAST_ADMINISTRATOR\""));
+	}
+
+	@Test
+	void aNonAdminCannotRevokeOrReactivateAccess() {
+		String luffyId = userIdOf("luffy", tokenFor("luffy", "luffy-pass"));
+
+		this.restTestClient.post()
+			.uri("/admin/users/" + luffyId + "/revoke-access")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
+			.exchange()
+			.expectStatus()
+			.isForbidden();
 	}
 
 	@Test
