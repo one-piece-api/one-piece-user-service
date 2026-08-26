@@ -10,7 +10,8 @@ import dev.onepieceapi.exception.ErrorCode;
  */
 public enum UserErrorCode implements ErrorCode {
 
-	EMAIL_ALREADY_REGISTERED, NOT_FOUND, INVITATION_NOT_RESENDABLE, EMAIL_DELIVERY_FAILED;
+	EMAIL_ALREADY_REGISTERED, NOT_FOUND, INVITATION_NOT_RESENDABLE, EMAIL_DELIVERY_FAILED, LAST_ADMINISTRATOR,
+	LAST_ROLE;
 
 	@Override
 	public String code() {

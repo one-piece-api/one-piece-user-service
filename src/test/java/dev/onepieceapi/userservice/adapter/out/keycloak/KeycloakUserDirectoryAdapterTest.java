@@ -5,6 +5,8 @@ import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakInvitatio
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
 import dev.onepieceapi.userservice.application.exception.EmailDeliveryFailedException;
 import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
+import dev.onepieceapi.userservice.application.exception.LastAdministratorException;
+import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
@@ -80,6 +82,11 @@ class KeycloakUserDirectoryAdapterTest {
 	private ArgumentCaptor<UserRepresentation> newUserCaptor;
 
 	private KeycloakUserDirectoryAdapter keycloakUserDirectoryAdapter;
+
+	/** Set by {@link #mockActiveUser} so a test can verify the exact add/remove mock used. */
+	private RoleScopeResource namiRoleScope;
+
+	private RoleScopeResource luffyRoleScope;
 
 	@BeforeEach
 	void setUp() {
@@ -415,6 +422,177 @@ class KeycloakUserDirectoryAdapterTest {
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.resendInvitation(UUID.fromString(NAMI_ID)))
 			.isInstanceOf(EmailDeliveryFailedException.class);
+	}
+
+	@Test
+	void findsASingleUserDirectlyFromKeycloak() {
+		mockActiveUser(LUFFY_ID, "ADMIN");
+
+		User user = this.keycloakUserDirectoryAdapter.findUser(UUID.fromString(LUFFY_ID));
+
+		assertThat(user.userId()).isEqualTo(UUID.fromString(LUFFY_ID));
+		assertThat(user.roles()).containsExactly("ADMIN");
+	}
+
+	@Test
+	void findUserFailsForAnUnknownId() {
+		when(this.usersResource.get(NAMI_ID)).thenThrow(new NotFoundException());
+
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.findUser(UUID.fromString(NAMI_ID)))
+			.isInstanceOf(UserNotFoundException.class);
+	}
+
+	@Test
+	void assignsANewRoleToAnExistingUser() {
+		mockActiveUser(NAMI_ID, "EDITOR");
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		RoleRepresentation adminRole = mockRoleRepresentation(rolesResource, "ADMIN");
+
+		User updated = this.keycloakUserDirectoryAdapter.assignRole(UUID.fromString(NAMI_ID), RealmRole.ADMIN);
+
+		verify(this.namiRoleScope).add(List.of(adminRole));
+		assertThat(updated.roles()).containsExactlyInAnyOrder("EDITOR", "ADMIN");
+	}
+
+	@Test
+	void assigningAnAlreadyHeldRoleIsANoOp() {
+		mockActiveUser(NAMI_ID, "EDITOR");
+
+		User updated = this.keycloakUserDirectoryAdapter.assignRole(UUID.fromString(NAMI_ID), RealmRole.EDITOR);
+
+		assertThat(updated.roles()).containsExactly("EDITOR");
+		verify(this.realmResource, never()).roles();
+	}
+
+	@Test
+	void assignRoleFailsForAnUnknownUser() {
+		when(this.usersResource.get(NAMI_ID)).thenThrow(new NotFoundException());
+
+		assertThatThrownBy(
+				() -> this.keycloakUserDirectoryAdapter.assignRole(UUID.fromString(NAMI_ID), RealmRole.ADMIN))
+			.isInstanceOf(UserNotFoundException.class);
+	}
+
+	@Test
+	void revokesARoleFromAUserWithMultipleRoles() {
+		mockActiveUser(NAMI_ID, "EDITOR", "REVIEWER");
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		RoleRepresentation reviewerRole = mockRoleRepresentation(rolesResource, "REVIEWER");
+
+		User updated = this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(NAMI_ID), RealmRole.REVIEWER);
+
+		verify(this.namiRoleScope).remove(List.of(reviewerRole));
+		assertThat(updated.roles()).containsExactly("EDITOR");
+	}
+
+	@Test
+	void revokingAnAbsentRoleIsANoOp() {
+		mockActiveUser(NAMI_ID, "EDITOR");
+
+		User updated = this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(NAMI_ID), RealmRole.REVIEWER);
+
+		assertThat(updated.roles()).containsExactly("EDITOR");
+		verify(this.realmResource, never()).roles();
+	}
+
+	@Test
+	void refusesToRemoveTheLastRemainingRoleFromAUser() {
+		mockActiveUser(NAMI_ID, "EDITOR");
+
+		assertThatThrownBy(
+				() -> this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(NAMI_ID), RealmRole.EDITOR))
+			.isInstanceOf(LastRoleException.class);
+	}
+
+	@Test
+	void refusesToRemoveAdminWhenNoOtherAdminExists() {
+		mockActiveUser(LUFFY_ID, "ADMIN", "EDITOR");
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		var roleResource = mock(RoleResource.class);
+		when(rolesResource.get("ADMIN")).thenReturn(roleResource);
+		when(roleResource.getUserMembers(0, 2)).thenReturn(List.of(userWithId(LUFFY_ID)));
+
+		assertThatThrownBy(
+				() -> this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(LUFFY_ID), RealmRole.ADMIN))
+			.isInstanceOf(LastAdministratorException.class);
+	}
+
+	/**
+	 * Reproduces a real gap caught by {@code AdminUserListingIntegrationTest} against a
+	 * real Keycloak: the seeded bootstrap admin holds only the ADMIN role, so both
+	 * UF-IDU-15 ("at least one role") and UF-IDU-16 ("at least one ADMIN") technically
+	 * apply - the ADMIN-specific rejection must win, not the generic one.
+	 */
+	@Test
+	void refusesToRemoveTheOnlyRoleWhenItIsAlsoTheLastAdminRole() {
+		mockActiveUser(LUFFY_ID, "ADMIN");
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		var roleResource = mock(RoleResource.class);
+		when(rolesResource.get("ADMIN")).thenReturn(roleResource);
+		when(roleResource.getUserMembers(0, 2)).thenReturn(List.of(userWithId(LUFFY_ID)));
+
+		assertThatThrownBy(
+				() -> this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(LUFFY_ID), RealmRole.ADMIN))
+			.isInstanceOf(LastAdministratorException.class);
+	}
+
+	@Test
+	void allowsRemovingAdminWhenAnotherAdminExists() {
+		mockActiveUser(LUFFY_ID, "ADMIN", "EDITOR");
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		var roleResource = mock(RoleResource.class);
+		when(rolesResource.get("ADMIN")).thenReturn(roleResource);
+		when(roleResource.getUserMembers(0, 2)).thenReturn(List.of(userWithId(LUFFY_ID), userWithId(NAMI_ID)));
+		RoleRepresentation adminRole = new RoleRepresentation("ADMIN", null, false);
+		when(roleResource.toRepresentation()).thenReturn(adminRole);
+
+		User updated = this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(LUFFY_ID), RealmRole.ADMIN);
+
+		verify(this.luffyRoleScope).remove(List.of(adminRole));
+		assertThat(updated.roles()).containsExactly("EDITOR");
+	}
+
+	@Test
+	void revokeRoleFailsForAnUnknownUser() {
+		when(this.usersResource.get(NAMI_ID)).thenThrow(new NotFoundException());
+
+		assertThatThrownBy(
+				() -> this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(NAMI_ID), RealmRole.EDITOR))
+			.isInstanceOf(UserNotFoundException.class);
+	}
+
+	/**
+	 * Stubs a full {@code UsersResource.get(keycloakId)} chain for an ACTIVE user holding
+	 * exactly {@code roleNames} - {@code listAll()} for the role fetch every
+	 * {@code loadUser} call makes, and {@code realmLevel()} itself exposed via
+	 * {@link #namiRoleScope}/{@link #luffyRoleScope} so a test can verify the
+	 * {@code add}/{@code remove} call made against that same mock, rather than a second,
+	 * unstubbed one.
+	 */
+	private void mockActiveUser(String keycloakId, String... roleNames) {
+		var userResource = mock(UserResource.class);
+		when(this.usersResource.get(keycloakId)).thenReturn(userResource);
+		when(userResource.toRepresentation()).thenReturn(userWithId(keycloakId));
+		var roleMappingResource = mock(RoleMappingResource.class);
+		var realmRoleScopeResource = mock(RoleScopeResource.class);
+		when(userResource.roles()).thenReturn(roleMappingResource);
+		when(roleMappingResource.realmLevel()).thenReturn(realmRoleScopeResource);
+		List<RoleRepresentation> roles = List.of(roleNames)
+			.stream()
+			.map(name -> new RoleRepresentation(name, null, false))
+			.toList();
+		when(realmRoleScopeResource.listAll()).thenReturn(roles);
+		if (keycloakId.equals(NAMI_ID)) {
+			this.namiRoleScope = realmRoleScopeResource;
+		}
+		else {
+			this.luffyRoleScope = realmRoleScopeResource;
+		}
 	}
 
 	private UserResource mockPendingUser(String keycloakId) {

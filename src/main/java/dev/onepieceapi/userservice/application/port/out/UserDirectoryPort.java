@@ -25,6 +25,11 @@ public interface UserDirectoryPort {
 	long countUsers();
 
 	/**
+	 * @throws UserNotFoundException if no account exists for {@code userId}
+	 */
+	User findUser(UUID userId);
+
+	/**
 	 * Provisions a new identity with no usable credential and the given roles, then
 	 * triggers the identity provider's own invitation email mechanism (UF-IDU-01) - no
 	 * token, link or expiry is generated or stored by this application; see
@@ -56,5 +61,23 @@ public interface UserDirectoryPort {
 	 * {@code INVITATION_EXPIRED}
 	 */
 	User resendInvitation(UUID userId);
+
+	/**
+	 * Grants {@code role} to {@code userId} (UF-IDU-15). Idempotent: a role the account
+	 * already has is left as-is, not an error.
+	 * @throws UserNotFoundException if no account exists for {@code userId}
+	 */
+	User assignRole(UUID userId, RealmRole role);
+
+	/**
+	 * Revokes {@code role} from {@code userId} (UF-IDU-15). Idempotent: a role the account
+	 * does not currently have is left as-is, not an error.
+	 * @throws UserNotFoundException if no account exists for {@code userId}
+	 * @throws dev.onepieceapi.userservice.application.exception.LastRoleException if this
+	 * would leave the account with no roles at all
+	 * @throws dev.onepieceapi.userservice.application.exception.LastAdministratorException
+	 * if {@code role} is ADMIN and this account is the realm's last one
+	 */
+	User revokeRole(UUID userId, RealmRole role);
 
 }

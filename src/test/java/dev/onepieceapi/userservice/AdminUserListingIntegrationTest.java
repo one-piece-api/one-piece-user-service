@@ -1,5 +1,7 @@
 package dev.onepieceapi.userservice;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.ServerSetup;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
@@ -175,6 +177,137 @@ class AdminUserListingIntegrationTest {
 			.exchange()
 			.expectStatus()
 			.isForbidden();
+	}
+
+	@Test
+	void anAdminCanFetchASingleUser() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+		String luffyId = userIdOf("luffy", adminToken);
+
+		this.restTestClient.get()
+			.uri("/admin/users/" + luffyId)
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"username\":\"luffy\"")
+				.contains("\"ADMIN\""));
+	}
+
+	@Test
+	void anAdminCanAssignAndRevokeARole() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+		String zoroId = inviteAndGetUserId("zoro@onepiece.local", "EDITOR", adminToken);
+
+		this.restTestClient.put()
+			.uri("/admin/users/" + zoroId + "/roles/ADMIN")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"EDITOR\"").contains("\"ADMIN\""));
+
+		this.restTestClient.delete()
+			.uri("/admin/users/" + zoroId + "/roles/ADMIN")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"EDITOR\"")
+				.doesNotContain("\"ADMIN\""));
+	}
+
+	@Test
+	void revokingAUsersOnlyRoleIsRejected() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+		String chopperId = inviteAndGetUserId("chopper@onepiece.local", "EDITOR", adminToken);
+
+		this.restTestClient.delete()
+			.uri("/admin/users/" + chopperId + "/roles/EDITOR")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.consumeWith(
+					result -> assertThat(result.getResponseBody()).contains("\"errorCode\":\"USER_LAST_ROLE\""));
+	}
+
+	/**
+	 * The fixture realm seeds exactly one ADMIN (luffy) - rejecting this leaves that
+	 * invariant intact for every other test in this class, so no cleanup is needed.
+	 */
+	@Test
+	void revokingTheOnlyAdministratorIsRejected() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+		String luffyId = userIdOf("luffy", adminToken);
+
+		this.restTestClient.delete()
+			.uri("/admin/users/" + luffyId + "/roles/ADMIN")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody())
+				.contains("\"errorCode\":\"USER_LAST_ADMINISTRATOR\""));
+	}
+
+	@Test
+	void aNonAdminCannotAssignOrRevokeRoles() {
+		String luffyId = userIdOf("luffy", tokenFor("luffy", "luffy-pass"));
+
+		this.restTestClient.put()
+			.uri("/admin/users/" + luffyId + "/roles/EDITOR")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
+			.exchange()
+			.expectStatus()
+			.isForbidden();
+	}
+
+	private String inviteAndGetUserId(String email, String role, String adminToken) {
+		String body = this.restTestClient.post()
+			.uri("/admin/users")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("{\"email\": \"" + email + "\", \"roles\": [\"" + role + "\"]}")
+			.exchange()
+			.expectStatus()
+			.isCreated()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		return readJson(body).get("userId").asText();
+	}
+
+	private String userIdOf(String username, String adminToken) {
+		String body = this.restTestClient.get()
+			.uri("/admin/users?size=50")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		for (JsonNode user : readJson(body).get("content")) {
+			if (user.get("username").asText().equals(username)) {
+				return user.get("userId").asText();
+			}
+		}
+		throw new IllegalStateException("No user named " + username + " in the admin listing");
+	}
+
+	private static JsonNode readJson(String body) {
+		try {
+			return new ObjectMapper().readTree(body);
+		}
+		catch (Exception ex) {
+			throw new IllegalStateException("Could not parse JSON response: " + body, ex);
+		}
 	}
 
 	private static String tokenFor(String username, String password) {

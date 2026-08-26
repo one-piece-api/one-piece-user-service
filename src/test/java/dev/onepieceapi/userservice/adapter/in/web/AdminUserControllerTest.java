@@ -5,9 +5,12 @@ import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthen
 import dev.onepieceapi.userservice.adapter.in.web.security.SecurityConfig;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
 import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
+import dev.onepieceapi.userservice.application.exception.LastAdministratorException;
+import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
 import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
+import dev.onepieceapi.userservice.application.service.AdminUserRoleService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
@@ -33,8 +36,10 @@ import java.util.stream.Collectors;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -60,6 +65,9 @@ class AdminUserControllerTest {
 
 	@MockitoBean
 	private AdminUserInvitationService adminUserInvitationService;
+
+	@MockitoBean
+	private AdminUserRoleService adminUserRoleService;
 
 	@Test
 	void anAdminCanListUsers() throws Exception {
@@ -181,6 +189,100 @@ class AdminUserControllerTest {
 		var targetId = UUID.randomUUID();
 
 		var request = post("/admin/users/" + targetId + "/resend-invitation").with(asUser(nami, "EDITOR"));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void anAdminCanFetchASingleUser() throws Exception {
+		var luffy = luffy();
+		when(this.adminUserQueryService.getUser(luffy.userId())).thenReturn(luffy);
+
+		var request = get("/admin/users/" + luffy.userId()).with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void fetchingAnUnknownUserReturnsNotFound() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		when(this.adminUserQueryService.getUser(targetId)).thenThrow(new UserNotFoundException(targetId));
+
+		var request = get("/admin/users/" + targetId).with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void aNonAdminCannotFetchASingleUser() throws Exception {
+		var nami = nami();
+
+		var request = get("/admin/users/" + nami.userId()).with(asUser(nami, "EDITOR"));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void anAdminCanAssignARole() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		var updated = new User(targetId, "usopp", "usopp@onepiece.local", AccountStatus.ACTIVE,
+				List.of("EDITOR", "ADMIN"), Instant.EPOCH);
+		when(this.adminUserRoleService.assignRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
+
+		var request = put("/admin/users/" + targetId + "/roles/ADMIN").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void aNonAdminCannotAssignARole() throws Exception {
+		var nami = nami();
+		var targetId = UUID.randomUUID();
+
+		var request = put("/admin/users/" + targetId + "/roles/ADMIN").with(asUser(nami, "EDITOR"));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void anAdminCanRevokeARole() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		var updated = new User(targetId, "usopp", "usopp@onepiece.local", AccountStatus.ACTIVE, List.of("EDITOR"),
+				Instant.EPOCH);
+		when(this.adminUserRoleService.revokeRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
+
+		var request = delete("/admin/users/" + targetId + "/roles/ADMIN").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void revokingTheLastAdministratorRoleReturnsConflict() throws Exception {
+		var luffy = luffy();
+		when(this.adminUserRoleService.revokeRole(luffy.userId(), RealmRole.ADMIN, luffy))
+			.thenThrow(new LastAdministratorException(luffy.userId()));
+
+		var request = delete("/admin/users/" + luffy.userId() + "/roles/ADMIN").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request)
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.errorCode").value("USER_LAST_ADMINISTRATOR"));
+	}
+
+	@Test
+	void revokingAUsersLastRoleReturnsConflict() throws Exception {
+		var luffy = luffy();
+		var targetId = UUID.randomUUID();
+		when(this.adminUserRoleService.revokeRole(targetId, RealmRole.EDITOR, luffy))
+			.thenThrow(new LastRoleException(targetId, RealmRole.EDITOR));
+
+		var request = delete("/admin/users/" + targetId + "/roles/EDITOR").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request)
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.errorCode").value("USER_LAST_ROLE"));
+	}
+
+	@Test
+	void aNonAdminCannotRevokeARole() throws Exception {
+		var nami = nami();
+		var targetId = UUID.randomUUID();
+
+		var request = delete("/admin/users/" + targetId + "/roles/ADMIN").with(asUser(nami, "EDITOR"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 

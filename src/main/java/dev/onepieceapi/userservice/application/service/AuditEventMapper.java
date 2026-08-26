@@ -25,4 +25,14 @@ class AuditEventMapper {
 				target.email(), occurredAt);
 	}
 
+	AuditEvent roleAssigned(User actor, User target, Instant occurredAt) {
+		return new AuditEvent(AuditAction.ROLE_ASSIGNED, actor.userId(), actor.email(), target.userId(),
+				target.email(), occurredAt);
+	}
+
+	AuditEvent roleRevoked(User actor, User target, Instant occurredAt) {
+		return new AuditEvent(AuditAction.ROLE_REVOKED, actor.userId(), actor.email(), target.userId(),
+				target.email(), occurredAt);
+	}
+
 }

@@ -63,4 +63,14 @@ class AdminUserQueryServiceTest {
 		assertThat(page.getContent()).hasSize(1);
 	}
 
+	@Test
+	void getsASingleUserThroughTheIdentityDirectory() {
+		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of("ADMIN"), null);
+		when(this.userDirectoryPort.findUser(LUFFY_ID)).thenReturn(luffy);
+
+		User result = this.adminUserQueryService.getUser(LUFFY_ID);
+
+		assertThat(result).isEqualTo(luffy);
+	}
+
 }

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -22,6 +23,11 @@ public class AdminUserQueryService {
 		List<User> content = this.userDirectoryPort.findUsers(offset, pageable.getPageSize());
 
 		return new PageImpl<>(content, pageable, this.userDirectoryPort.countUsers());
+	}
+
+	/** Backs the Step 6 role-editor route - a single user, fetched directly by id. */
+	public User getUser(UUID userId) {
+		return this.userDirectoryPort.findUser(userId);
 	}
 
 }
