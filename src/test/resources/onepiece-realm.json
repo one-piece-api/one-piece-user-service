@@ -1,6 +1,7 @@
 {
   "realm": "onepiece",
   "enabled": true,
+  "editUsernameAllowed": true,
   "adminEventsEnabled": true,
   "adminEventsDetailsEnabled": false,
   "smtpServer": {

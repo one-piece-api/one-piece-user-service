@@ -38,6 +38,42 @@ defined in `realm-onepiece.json` - the declarative default already lets the acco
 their own username, independent of the legacy `editUsernameAllowed` realm flag (toggling it
 had no effect on the returned permissions). No realm configuration change was needed for this.
 
+> **Correction (found during Step 6 QA, see `docs/adr/0006-role-update-endpoints-and-user-detail-view.md`):**
+> the check above was real but insufficient - it verified the declarative User Profile's
+> *reported* permissions via the Admin REST API, not what the hosted "Update Account
+> Information" required-action page actually renders. In practice the invited user had no
+> way to set a username there: the built-in `UPDATE_PROFILE` required action does not
+> decide whether to show the username field from the User Profile permissions alone: it
+> additionally gates on the realm's legacy `editUsernameAllowed` flag for that specific
+> screen, independently of what `/users/profile` reports (`edit: ["admin", "user"]`
+> unchanged either way - confirmed by re-querying it after the fix below, same result).
+> **`editUsernameAllowed: true` was added to both `realm-onepiece.json` and the
+> Testcontainers fixture `one-piece-user-service/src/test/resources/onepiece-realm.json`**,
+> and confirmed fixed by walking through the actual required-action page (a temporary
+> credential + `UPDATE_PROFILE` required action set on the seeded `usopp` account via
+> `kcadm.sh`, reverted after) - the Username field is now present and editable. Applying
+> this to the already-running local cluster required deleting and re-importing the
+> `onepiece` realm (Keycloak does not update an already-imported realm on restart,
+> keycloak/keycloak#14884), which also removed the one real (non-seeded) invited account
+> that existed only in the live DB - re-invited afterward.
+>
+> **Follow-up correction (same QA pass):** the default declarative profile that grants
+> `username` self-edit also leaves `email`, `firstName` and `lastName` self-editable on the
+> same screen - including `email`, which UF-IDU-02's rules now explicitly forbid changing
+> during activation (see `application-user-identity-management.md`), since it would let an
+> invited user set an address never confirmed by UF-IDU-04. Fixed with an **explicit User
+> Profile config** (`onepiece-infrastructure/scripts/configure-user-profile.sh`, a postsync
+> Helmfile hook next to `configure-realm-smtp.sh`) restricting `email`'s `permissions.edit`
+> to `["admin"]` only, `view` unchanged - `firstName`/`lastName` were deliberately left
+> self-editable: both are `required` on this same screen and never pre-filled by
+> `KeycloakUserDirectoryAdapter`'s invite flow, so locking them down would leave an invited
+> user unable to complete activation at all. Not embedded in `realm-onepiece.json` itself
+> (the `components` block for a custom User Profile is a known-unreliable Keycloak import
+> path - keycloak/keycloak#23970, adorsys/keycloak-config-cli#979), same reasoning as the
+> SMTP password already being set via a postsync hook rather than the realm JSON. Confirmed
+> with the same `usopp` walkthrough: typing into Email left its value unchanged, typing into
+> Username still worked.
+
 Consequences for Step 5's scope:
 
 - **No new public endpoint or page.** `user-service` gains only a `resendInvitation` port
