@@ -114,6 +114,54 @@ class AdminUserListingIntegrationTest {
 				.contains("\"ADMIN\""));
 	}
 
+	/**
+	 * Exercises the real Keycloak composite-role expansion end to end (ADR-0007): ADMIN's
+	 * client-role composites on "onepiece-proxy" (see onepiece-realm.json) must reach the
+	 * issued token's {@code resource_access.onepiece-proxy.roles} claim and come back out
+	 * through {@code /me} as {@code permissions} - nothing this application computes
+	 * itself.
+	 */
+	@Test
+	void meReturnsPermissionsFromTheRealmsRealCompositeClientRoles() {
+		this.restTestClient.get()
+			.uri("/me")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"users:read\"")
+				.contains("\"users:invite\"")
+				.contains("\"roles:write\"")
+				.contains("\"access:write\"")
+				.contains("\"audit:read\""));
+	}
+
+	@Test
+	void anAdminCanListTheRolePermissionRegistry() {
+		this.restTestClient.get()
+			.uri("/admin/roles")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"role\":\"ADMIN\"")
+				.contains("\"users:read\"")
+				.contains("\"role\":\"EDITOR\"")
+				.contains("\"docs:write\""));
+	}
+
+	@Test
+	void aNonAdminCannotListTheRolePermissionRegistry() {
+		this.restTestClient.get()
+			.uri("/admin/roles")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
+			.exchange()
+			.expectStatus()
+			.isForbidden();
+	}
+
 	@Test
 	void aNonAdminIsForbidden() {
 		this.restTestClient.get()

@@ -30,10 +30,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -366,6 +368,28 @@ class AdminUserControllerTest {
 		var targetId = UUID.randomUUID();
 
 		var request = post("/admin/users/" + targetId + "/reactivate").with(asUser(nami, "EDITOR"));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void anAdminCanListTheRolePermissionRegistry() throws Exception {
+		var luffy = luffy();
+		var rolePermissions = Map.of(RealmRole.ADMIN, List.of("audit:read", "users:read"), RealmRole.EDITOR,
+				List.of("docs:read", "docs:write"));
+		when(this.adminUserQueryService.listRolePermissions()).thenReturn(rolePermissions);
+
+		var request = get("/admin/roles").with(asUser(luffy, "ADMIN"));
+		var response = this.mockMvc.perform(request).andExpect(status().isOk()).andReturn().getResponse();
+
+		assertThat(response.getContentAsString()).contains("\"role\":\"ADMIN\"", "\"role\":\"EDITOR\"",
+				"\"audit:read\"", "\"users:read\"", "\"docs:read\"", "\"docs:write\"");
+	}
+
+	@Test
+	void aNonAdminCannotListTheRolePermissionRegistry() throws Exception {
+		var nami = nami();
+
+		var request = get("/admin/roles").with(asUser(nami, "EDITOR"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 

@@ -42,4 +42,20 @@ public class JwtUtils {
 		return values.stream().filter(String.class::isInstance).map(String.class::cast).toList();
 	}
 
+	/**
+	 * Reads the OIDC-standard {@code resource_access.<clientId>.roles} claim - a client's
+	 * roles, one level deeper than {@link #getNestedStringListClaim}'s parent/child shape
+	 * handles.
+	 */
+	public List<String> getResourceAccessClientRolesClaim(Jwt jwt, String clientId) {
+		Map<String, Object> resourceAccess = jwt.getClaimAsMap("resource_access");
+
+		if (resourceAccess == null || !(resourceAccess.get(clientId) instanceof Map<?, ?> clientAccess)
+				|| !(clientAccess.get("roles") instanceof List<?> values)) {
+			return List.of();
+		}
+
+		return values.stream().filter(String.class::isInstance).map(String.class::cast).toList();
+	}
+
 }

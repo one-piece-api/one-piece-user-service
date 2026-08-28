@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,6 +42,35 @@ class ApplicationUserJwtAuthenticationConverterTest {
 		var roles = List.of("ADMIN", "EDITOR");
 		var expected = new User(USER_ID, USERNAME, EMAIL, AccountStatus.ACTIVE, roles, null);
 		assertThat(((ApplicationUserAuthenticationToken) authentication).getUser()).isEqualTo(expected);
+	}
+
+	@Test
+	void alsoResolvesPermissionAuthoritiesFromTheResourceAccessClaim() {
+		Map<String, Object> realmAccess = Map.of("roles", List.of("ADMIN"));
+		Map<String, Object> resourceAccess = Map.of("onepiece-proxy",
+				Map.of("roles", List.of("users:read", "audit:read")));
+		Map<String, Object> claims = new HashMap<>();
+		claims.put("sub", USER_ID.toString());
+		claims.put("preferred_username", USERNAME);
+		claims.put("email", EMAIL);
+		claims.put("realm_access", realmAccess);
+		claims.put("resource_access", resourceAccess);
+		Jwt jwt = jwtWithClaims(claims);
+
+		var authentication = this.converter.convert(jwt);
+
+		assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+			.containsExactlyInAnyOrder("ROLE_ADMIN", "PERMISSION_users:read", "PERMISSION_audit:read");
+	}
+
+	@Test
+	void resolvesNoPermissionAuthoritiesWhenTheResourceAccessClaimIsAbsent() {
+		Jwt jwt = jwtWithSubjectUsernameEmailAndRoles(USER_ID, USERNAME, EMAIL, "ADMIN");
+
+		var authentication = this.converter.convert(jwt);
+
+		assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+			.containsExactly("ROLE_ADMIN");
 	}
 
 	@Test

@@ -38,11 +38,14 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -677,6 +680,36 @@ class KeycloakUserDirectoryAdapterTest {
 			.isInstanceOf(UserNotFoundException.class);
 	}
 
+	@Test
+	void listsEachRealmRolesClientRoleCompositesAsItsPermissions() {
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		mockClientRoleComposites(rolesResource, "ADMIN", "users:read", "audit:read");
+		mockClientRoleComposites(rolesResource, "REVIEWER", "docs:read", "docs:review");
+		mockClientRoleComposites(rolesResource, "EDITOR", "docs:read", "docs:write");
+
+		Map<RealmRole, List<String>> permissions = this.keycloakUserDirectoryAdapter.listRolePermissions();
+
+		assertThat(permissions).containsEntry(RealmRole.ADMIN, List.of("audit:read", "users:read"))
+			.containsEntry(RealmRole.REVIEWER, List.of("docs:read", "docs:review"))
+			.containsEntry(RealmRole.EDITOR, List.of("docs:read", "docs:write"));
+	}
+
+	@Test
+	void ignoresARealmRoleCompositeWhenListingPermissions() {
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		var roleResource = mock(RoleResource.class);
+		when(rolesResource.get(anyString())).thenReturn(roleResource);
+		var realmComposite = new RoleRepresentation("default-roles-onepiece", null, true);
+		realmComposite.setClientRole(false);
+		when(roleResource.getRoleComposites()).thenReturn(Set.of(realmComposite));
+
+		Map<RealmRole, List<String>> permissions = this.keycloakUserDirectoryAdapter.listRolePermissions();
+
+		assertThat(permissions.get(RealmRole.ADMIN)).isEmpty();
+	}
+
 	/**
 	 * Stubs a full {@code UsersResource.get(keycloakId)} chain for an ACTIVE user holding
 	 * exactly {@code roleNames} - {@code listAll()} for the role fetch every
@@ -764,6 +797,17 @@ class KeycloakUserDirectoryAdapterTest {
 		when(rolesResource.get(roleName)).thenReturn(roleResource);
 		when(roleResource.toRepresentation()).thenReturn(representation);
 		return representation;
+	}
+
+	private void mockClientRoleComposites(RolesResource rolesResource, String roleName, String... permissionNames) {
+		var roleResource = mock(RoleResource.class);
+		when(rolesResource.get(roleName)).thenReturn(roleResource);
+		Set<RoleRepresentation> composites = Arrays.stream(permissionNames).map(name -> {
+			var representation = new RoleRepresentation(name, null, false);
+			representation.setClientRole(true);
+			return representation;
+		}).collect(Collectors.toSet());
+		when(roleResource.getRoleComposites()).thenReturn(composites);
 	}
 
 	private void mockRoles(String keycloakId, String... roleNames) {

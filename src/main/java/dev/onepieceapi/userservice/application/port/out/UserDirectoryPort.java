@@ -7,6 +7,7 @@ import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -98,5 +99,14 @@ public interface UserDirectoryPort {
 	 * @throws UserNotFoundException if no account exists for {@code userId}
 	 */
 	User reactivate(UUID userId);
+
+	/**
+	 * The fixed realm roles and the permissions each currently bundles - its Keycloak
+	 * composite client-roles (see
+	 * {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}). Powers the UI's
+	 * read-only role/permission registry; editing a role's permission set happens in
+	 * Keycloak directly for now, not through this port.
+	 */
+	Map<RealmRole, List<String>> listRolePermissions();
 
 }

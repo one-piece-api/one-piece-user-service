@@ -2,6 +2,7 @@ package dev.onepieceapi.userservice.adapter.in.web;
 
 import dev.onepieceapi.userservice.adapter.in.web.dto.InviteUserRequest;
 import dev.onepieceapi.userservice.adapter.in.web.dto.PageResponse;
+import dev.onepieceapi.userservice.adapter.in.web.dto.RolePermissionsResponse;
 import dev.onepieceapi.userservice.adapter.in.web.dto.UserSummaryResponse;
 import dev.onepieceapi.userservice.adapter.in.web.mapper.UserSummaryResponseMapper;
 import dev.onepieceapi.userservice.application.service.AdminUserAccessService;
@@ -26,6 +27,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -56,6 +59,22 @@ class AdminUserController {
 	@GetMapping("/admin/users/{userId}")
 	UserSummaryResponse getUser(@PathVariable UUID userId) {
 		return UserSummaryResponseMapper.toResponse(this.adminUserQueryService.getUser(userId));
+	}
+
+	/**
+	 * The read-only role/permission registry (see
+	 * {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}) - powers the UI's
+	 * "Roles &amp; Permissions" panel and lets the frontend compute any user's effective
+	 * permissions client-side from their roles, without a per-user server call.
+	 */
+	@GetMapping("/admin/roles")
+	List<RolePermissionsResponse> listRoles() {
+		Map<RealmRole, List<String>> rolePermissions = this.adminUserQueryService.listRolePermissions();
+		return rolePermissions.entrySet()
+			.stream()
+			.map(entry -> new RolePermissionsResponse(entry.getKey().name(), entry.getValue()))
+			.sorted((a, b) -> a.role().compareTo(b.role()))
+			.toList();
 	}
 
 	@PostMapping("/admin/users")

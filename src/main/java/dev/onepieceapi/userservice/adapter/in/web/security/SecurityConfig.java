@@ -29,6 +29,16 @@ public class SecurityConfig {
 	 */
 	public static final String ROLE_AUTHORITY_PREFIX = "ROLE_";
 
+	/**
+	 * Permission authorities (e.g. {@code PERMISSION_users:read}), sourced from the JWT's
+	 * {@code resource_access} claim - see
+	 * {@link ApplicationUserJwtAuthenticationConverter} and
+	 * {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}. Kept distinct
+	 * from {@link #ROLE_AUTHORITY_PREFIX} so {@code hasRole}/{@code hasAuthority} checks
+	 * never accidentally match the wrong kind.
+	 */
+	public static final String PERMISSION_AUTHORITY_PREFIX = "PERMISSION_";
+
 	private static final String HEALTH_PROBE_PATH = "/actuator/health/**";
 
 	private static final String ADMIN_PATH = "/admin/**";
