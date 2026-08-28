@@ -11,6 +11,7 @@ import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import dev.onepieceapi.userservice.domain.UserFilter;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -113,7 +115,7 @@ class KeycloakUserDirectoryAdapterTest {
 	void paginatesTheRealmsOwnUserListNatively() {
 		when(this.usersResource.list(20, 10)).thenReturn(List.of());
 
-		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(20, 10);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(20, 10, UserFilter.none());
 
 		verify(this.usersResource).list(20, 10);
 		assertThat(users).isEmpty();
@@ -127,7 +129,7 @@ class KeycloakUserDirectoryAdapterTest {
 		mockRoles(LUFFY_ID, "ADMIN");
 		mockRoles(NAMI_ID, "EDITOR", "REVIEWER");
 
-		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, UserFilter.none());
 
 		assertThat(users).extracting(User::userId, User::roles)
 			.containsExactlyInAnyOrder(tuple(UUID.fromString(LUFFY_ID), List.of("ADMIN")),
@@ -140,7 +142,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(this.usersResource.list(0, 10)).thenReturn(List.of(luffy));
 		mockRoles(LUFFY_ID, "ADMIN", "default-roles-onepiece");
 
-		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, UserFilter.none());
 
 		assertThat(users.getFirst().roles()).containsExactly("ADMIN");
 	}
@@ -152,7 +154,7 @@ class KeycloakUserDirectoryAdapterTest {
 		mockRoles(NAMI_ID);
 		mockAdminEvents(NAMI_ID, List.of());
 
-		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, UserFilter.none());
 
 		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.PENDING);
 	}
@@ -164,7 +166,7 @@ class KeycloakUserDirectoryAdapterTest {
 		mockRoles(NAMI_ID);
 		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(1)))));
 
-		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, UserFilter.none());
 
 		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.PENDING);
 	}
@@ -176,7 +178,7 @@ class KeycloakUserDirectoryAdapterTest {
 		mockRoles(NAMI_ID);
 		mockAdminEvents(NAMI_ID, List.of(adminEventAt(NOW.minus(Duration.ofHours(13)))));
 
-		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, UserFilter.none());
 
 		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.INVITATION_EXPIRED);
 	}
@@ -187,7 +189,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(this.usersResource.list(0, 10)).thenReturn(List.of(active));
 		mockRoles(LUFFY_ID, "ADMIN");
 
-		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, UserFilter.none());
 
 		assertThat(users.getFirst().status()).isEqualTo(AccountStatus.ACTIVE);
 		verifyNoAdminEventsCall();
@@ -218,14 +220,14 @@ class KeycloakUserDirectoryAdapterTest {
 	void countsTheRealmsTotalUsers() {
 		when(this.usersResource.count()).thenReturn(37);
 
-		assertThat(this.keycloakUserDirectoryAdapter.countUsers()).isEqualTo(37L);
+		assertThat(this.keycloakUserDirectoryAdapter.countUsers(UserFilter.none())).isEqualTo(37L);
 	}
 
 	@Test
 	void wrapsAKeycloakFailureWhenListingUsers() {
 		when(this.usersResource.list(0, 10)).thenThrow(new RuntimeException("Keycloak unreachable"));
 
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.findUsers(0, 10))
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.findUsers(0, 10, UserFilter.none()))
 			.isInstanceOf(KeycloakCommunicationException.class)
 			.cause()
 			.hasMessage("Keycloak unreachable");
@@ -235,10 +237,88 @@ class KeycloakUserDirectoryAdapterTest {
 	void wrapsAKeycloakFailureWhenCountingUsers() {
 		when(this.usersResource.count()).thenThrow(new RuntimeException("Keycloak unreachable"));
 
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.countUsers())
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.countUsers(UserFilter.none()))
 			.isInstanceOf(KeycloakCommunicationException.class)
 			.cause()
 			.hasMessage("Keycloak unreachable");
+	}
+
+	@Test
+	void aQueryFilterNarrowsViaKeycloaksNativeSearch() {
+		UserRepresentation nami = userWithUsername(NAMI_ID, "nami");
+		when(this.usersResource.search("nam", 0, 500)).thenReturn(List.of(nami));
+		mockRoles(NAMI_ID, "EDITOR");
+
+		var filter = new UserFilter("nam", null, null);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, filter);
+
+		assertThat(users).extracting(User::userId).containsExactly(UUID.fromString(NAMI_ID));
+		verify(this.usersResource, never()).list(anyInt(), anyInt());
+	}
+
+	@Test
+	void aRoleFilterNarrowsViaTheRolesMembershipEndpoint() {
+		UserRepresentation luffy = userWithId(LUFFY_ID);
+		UserRepresentation nami = userWithId(NAMI_ID);
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		var roleResource = mock(RoleResource.class);
+		when(rolesResource.get("ADMIN")).thenReturn(roleResource);
+		when(roleResource.getUserMembers(0, 500)).thenReturn(List.of(luffy));
+		mockRoles(LUFFY_ID, "ADMIN");
+
+		var filter = new UserFilter(null, RealmRole.ADMIN, null);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, filter);
+
+		assertThat(users).extracting(User::userId).containsExactly(UUID.fromString(LUFFY_ID));
+		verify(this.usersResource, never()).list(anyInt(), anyInt());
+		verify(this.usersResource, never()).search(anyString(), anyInt(), anyInt());
+	}
+
+	@Test
+	void aStatusFilterFetchesEveryUserUpToTheCapAndFiltersInMemory() {
+		UserRepresentation active = userWithId(LUFFY_ID);
+		UserRepresentation pending = pendingUserWithId(NAMI_ID);
+		when(this.usersResource.list(0, 500)).thenReturn(List.of(active, pending));
+		mockRoles(LUFFY_ID, "ADMIN");
+		mockRoles(NAMI_ID, "EDITOR");
+		mockAdminEvents(NAMI_ID, List.of());
+
+		var filter = new UserFilter(null, null, AccountStatus.PENDING);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, filter);
+
+		assertThat(users).extracting(User::userId).containsExactly(UUID.fromString(NAMI_ID));
+	}
+
+	@Test
+	void combinesARoleFilterWithAQueryOnTheNarrowedCandidates() {
+		UserRepresentation luffy = userWithUsername(LUFFY_ID, "luffy");
+		UserRepresentation nami = userWithUsername(NAMI_ID, "nami");
+		var rolesResource = mock(RolesResource.class);
+		when(this.realmResource.roles()).thenReturn(rolesResource);
+		var roleResource = mock(RoleResource.class);
+		when(rolesResource.get("EDITOR")).thenReturn(roleResource);
+		when(roleResource.getUserMembers(0, 500)).thenReturn(List.of(luffy, nami));
+		mockRoles(LUFFY_ID, "EDITOR");
+		mockRoles(NAMI_ID, "EDITOR");
+
+		var filter = new UserFilter("nami", RealmRole.EDITOR, null);
+		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, filter);
+
+		assertThat(users).extracting(User::userId).containsExactly(UUID.fromString(NAMI_ID));
+	}
+
+	@Test
+	void countsOnlyTheFilteredMatches() {
+		UserRepresentation active = userWithId(LUFFY_ID);
+		UserRepresentation pending = pendingUserWithId(NAMI_ID);
+		when(this.usersResource.list(0, 500)).thenReturn(List.of(active, pending));
+		mockRoles(LUFFY_ID, "ADMIN");
+		mockRoles(NAMI_ID, "EDITOR");
+		mockAdminEvents(NAMI_ID, List.of());
+
+		var filter = new UserFilter(null, null, AccountStatus.PENDING);
+		assertThat(this.keycloakUserDirectoryAdapter.countUsers(filter)).isEqualTo(1L);
 	}
 
 	@Test
@@ -829,6 +909,17 @@ class KeycloakUserDirectoryAdapterTest {
 		user.setId(keycloakId);
 		user.setEmail(keycloakId + "@onepiece.local");
 		user.setEnabled(true);
+		return user;
+	}
+
+	/**
+	 * Like {@link #userWithId}, but with a real username - needed wherever a query filter
+	 * matches on it.
+	 */
+	private static UserRepresentation userWithUsername(String keycloakId, String username) {
+		UserRepresentation user = userWithId(keycloakId);
+		user.setUsername(username);
+		user.setEmail(username + "@onepiece.local");
 		return user;
 	}
 

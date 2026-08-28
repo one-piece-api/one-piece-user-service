@@ -3,6 +3,7 @@ package dev.onepieceapi.userservice.application.service;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import dev.onepieceapi.userservice.domain.UserFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -20,11 +21,11 @@ public class AdminUserQueryService {
 
 	private final UserDirectoryPort userDirectoryPort;
 
-	public Page<User> list(Pageable pageable) {
+	public Page<User> list(Pageable pageable, UserFilter filter) {
 		int offset = (int) pageable.getOffset();
-		List<User> content = this.userDirectoryPort.findUsers(offset, pageable.getPageSize());
+		List<User> content = this.userDirectoryPort.findUsers(offset, pageable.getPageSize(), filter);
 
-		return new PageImpl<>(content, pageable, this.userDirectoryPort.countUsers());
+		return new PageImpl<>(content, pageable, this.userDirectoryPort.countUsers(filter));
 	}
 
 	/** Backs the Step 6 role-editor route - a single user, fetched directly by id. */

@@ -5,6 +5,7 @@ import dev.onepieceapi.userservice.application.exception.InvitationNotResendable
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import dev.onepieceapi.userservice.domain.UserFilter;
 
 import java.util.List;
 import java.util.Map;
@@ -21,9 +22,19 @@ import java.util.UUID;
  */
 public interface UserDirectoryPort {
 
-	List<User> findUsers(int offset, int limit);
+	/**
+	 * {@code filter.isEmpty()} keeps the original, fully Keycloak-paginated path
+	 * ({@code GET /users?first=&max=}, one call, cost independent of realm size). A
+	 * non-empty filter has no single native endpoint covering every combination (role
+	 * membership, status and free-text search each need a different Keycloak call, and
+	 * status has no server-side filter at all), so it resolves a capped candidate batch
+	 * and paginates in memory instead - see
+	 * {@code KeycloakUserDirectoryAdapter#loadFilterCandidates} and
+	 * {@code docs/adr/0008-users-list-filters.md} for the trade-off this accepts.
+	 */
+	List<User> findUsers(int offset, int limit, UserFilter filter);
 
-	long countUsers();
+	long countUsers(UserFilter filter);
 
 	/**
 	 * @throws UserNotFoundException if no account exists for {@code userId}

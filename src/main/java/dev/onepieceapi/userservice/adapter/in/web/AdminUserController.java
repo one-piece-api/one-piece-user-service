@@ -9,8 +9,10 @@ import dev.onepieceapi.userservice.application.service.AdminUserAccessService;
 import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
 import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
 import dev.onepieceapi.userservice.application.service.AdminUserRoleService;
+import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import dev.onepieceapi.userservice.domain.UserFilter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,10 +27,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -49,9 +53,16 @@ class AdminUserController {
 
 	private final AdminUserAccessService adminUserAccessService;
 
+	/**
+	 * {@code q}/{@code role}/{@code status} narrow the listing (Step 15) - any
+	 * combination, or none for the original unfiltered page. See
+	 * {@code UserDirectoryPort#findUsers} for how a non-empty filter is resolved.
+	 */
 	@GetMapping("/admin/users")
-	PageResponse<UserSummaryResponse> listUsers(Pageable pageable) {
-		Page<UserSummaryResponse> page = this.adminUserQueryService.list(pageable)
+	PageResponse<UserSummaryResponse> listUsers(Pageable pageable, @RequestParam Optional<String> q,
+			@RequestParam Optional<RealmRole> role, @RequestParam Optional<AccountStatus> status) {
+		var filter = new UserFilter(q.orElse(null), role.orElse(null), status.orElse(null));
+		Page<UserSummaryResponse> page = this.adminUserQueryService.list(pageable, filter)
 			.map(UserSummaryResponseMapper::toResponse);
 		return PageResponse.from(page);
 	}

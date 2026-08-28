@@ -15,7 +15,9 @@ import dev.onepieceapi.userservice.application.service.AdminUserRoleService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import dev.onepieceapi.userservice.domain.UserFilter;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -81,10 +83,27 @@ class AdminUserControllerTest {
 		List<String> roles = List.of("ADMIN");
 		AccountStatus status = AccountStatus.ACTIVE;
 		var account = new User(luffy.userId(), luffy.username(), luffy.email(), status, roles, Instant.EPOCH);
-		when(this.adminUserQueryService.list(any())).thenReturn(new PageImpl<>(List.of(account)));
+		when(this.adminUserQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(account)));
 
 		var request = get("/admin/users").with(asUser(luffy, "ADMIN"));
 		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void anAdminCanFilterUsers() throws Exception {
+		var luffy = luffy();
+		List<String> roles = List.of("ADMIN");
+		var account = new User(luffy.userId(), luffy.username(), luffy.email(), AccountStatus.ACTIVE, roles,
+				Instant.EPOCH);
+		var filterCaptor = ArgumentCaptor.forClass(UserFilter.class);
+		when(this.adminUserQueryService.list(any(), filterCaptor.capture()))
+			.thenReturn(new PageImpl<>(List.of(account)));
+
+		var request = get("/admin/users?q=luf&role=ADMIN&status=ACTIVE").with(asUser(luffy, "ADMIN"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+
+		var expectedFilter = new UserFilter("luf", RealmRole.ADMIN, AccountStatus.ACTIVE);
+		assertThat(filterCaptor.getValue()).isEqualTo(expectedFilter);
 	}
 
 	@Test

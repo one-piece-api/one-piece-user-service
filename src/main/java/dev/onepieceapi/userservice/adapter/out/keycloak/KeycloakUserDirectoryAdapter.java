@@ -12,6 +12,7 @@ import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import dev.onepieceapi.userservice.domain.UserFilter;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -79,6 +81,13 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
 	private static final String EXECUTE_ACTIONS_EMAIL_PATH = "users/%s/execute-actions-email";
 
+	/**
+	 * Capped size for a filtered listing's candidate batch (Step 15) - generous for this
+	 * project's realm scale, not a general solution for a large one; see
+	 * {@code docs/adr/0008-users-list-filters.md}.
+	 */
+	private static final int FILTER_CANDIDATE_CAP = 500;
+
 	private final Keycloak keycloakAdminClient;
 
 	private final ExecutorService keycloakAdminExecutor;
@@ -90,22 +99,73 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	private final Clock clock;
 
 	@Override
-	public List<User> findUsers(int offset, int limit) {
+	public List<User> findUsers(int offset, int limit, UserFilter filter) {
 		try {
-			UsersResource users = getRealm().users();
-
-			List<CompletableFuture<User>> futures = users.list(offset, limit)
-				.stream()
-				.map(user -> fetchAsync(users, user))
-				.toList();
-
-			return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
-				.thenApply(_ -> futures.stream().map(CompletableFuture::join).toList())
-				.join();
+			if (filter.isEmpty()) {
+				UsersResource users = getRealm().users();
+				return resolveUsers(users, users.list(offset, limit));
+			}
+			List<User> matches = loadFilterCandidates(filter);
+			return matches.stream().skip(offset).limit(limit).toList();
 		}
 		catch (RuntimeException ex) {
 			throw new KeycloakCommunicationException("Failed to list users from Keycloak", ex);
 		}
+	}
+
+	@Override
+	public long countUsers(UserFilter filter) {
+		try {
+			if (filter.isEmpty()) {
+				return getRealm().users().count();
+			}
+			return loadFilterCandidates(filter).size();
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to count users in Keycloak", ex);
+		}
+	}
+
+	/**
+	 * Narrows via whichever single Keycloak call cuts the candidate set the most (role
+	 * membership, then free-text search, else every user up to the cap), resolves each
+	 * candidate the same way the unfiltered path does, then applies every filter field -
+	 * including the one already used to narrow, which is harmless and keeps this method
+	 * correct regardless of which pre-narrowing branch ran.
+	 */
+	private List<User> loadFilterCandidates(UserFilter filter) {
+		UsersResource users = getRealm().users();
+		List<UserRepresentation> candidates;
+		if (filter.role() != null) {
+			RolesResource realmRoles = getRealm().roles();
+			candidates = realmRoles.get(filter.role().name()).getUserMembers(0, FILTER_CANDIDATE_CAP);
+		}
+		else if (filter.query() != null && !filter.query().isBlank()) {
+			candidates = users.search(filter.query(), 0, FILTER_CANDIDATE_CAP);
+		}
+		else {
+			candidates = users.list(0, FILTER_CANDIDATE_CAP);
+		}
+		return resolveUsers(users, candidates).stream().filter(user -> matches(user, filter)).toList();
+	}
+
+	private static boolean matches(User user, UserFilter filter) {
+		String query = filter.query() == null ? null : filter.query().trim().toLowerCase(Locale.ROOT);
+		boolean matchesQuery = query == null || query.isEmpty()
+				|| user.username().toLowerCase(Locale.ROOT).contains(query)
+				|| user.email().toLowerCase(Locale.ROOT).contains(query);
+		boolean matchesRole = filter.role() == null || user.roles().contains(filter.role().name());
+		boolean matchesStatus = filter.status() == null || user.status() == filter.status();
+		return matchesQuery && matchesRole && matchesStatus;
+	}
+
+	private List<User> resolveUsers(UsersResource users, List<UserRepresentation> representations) {
+		Stream<CompletableFuture<User>> pending = representations.stream().map(user -> fetchAsync(users, user));
+		List<CompletableFuture<User>> futures = pending.toList();
+
+		return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+			.thenApply(_ -> futures.stream().map(CompletableFuture::join).toList())
+			.join();
 	}
 
 	private CompletableFuture<User> fetchAsync(UsersResource usersResource, UserRepresentation user) {
@@ -158,16 +218,6 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			.map(RoleRepresentation::getName)
 			.filter(name -> !this.keycloakAdminProperties.excludedRealmRoles().contains(name))
 			.toList();
-	}
-
-	@Override
-	public long countUsers() {
-		try {
-			return getRealm().users().count();
-		}
-		catch (RuntimeException ex) {
-			throw new KeycloakCommunicationException("Failed to count users in Keycloak", ex);
-		}
 	}
 
 	@Override

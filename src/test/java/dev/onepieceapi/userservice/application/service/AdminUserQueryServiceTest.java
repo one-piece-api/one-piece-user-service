@@ -4,6 +4,7 @@ import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import dev.onepieceapi.userservice.domain.UserFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,10 +45,10 @@ class AdminUserQueryServiceTest {
 		Pageable pageable = PageRequest.of(0, 20);
 		var roles = List.of("ADMIN");
 		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, roles, null);
-		when(this.userDirectoryPort.findUsers(0, 20)).thenReturn(List.of(luffy));
-		when(this.userDirectoryPort.countUsers()).thenReturn(1L);
+		when(this.userDirectoryPort.findUsers(0, 20, UserFilter.none())).thenReturn(List.of(luffy));
+		when(this.userDirectoryPort.countUsers(UserFilter.none())).thenReturn(1L);
 
-		Page<User> page = this.adminUserQueryService.list(pageable);
+		Page<User> page = this.adminUserQueryService.list(pageable, UserFilter.none());
 
 		assertThat(page.getContent()).containsExactly(luffy);
 	}
@@ -56,13 +57,28 @@ class AdminUserQueryServiceTest {
 	void reportsTheRealmsTotalUserCountRatherThanThisPagesSize() {
 		Pageable pageable = PageRequest.of(0, 1);
 		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, List.of(), null);
-		when(this.userDirectoryPort.findUsers(0, 1)).thenReturn(List.of(luffy));
-		when(this.userDirectoryPort.countUsers()).thenReturn(37L);
+		when(this.userDirectoryPort.findUsers(0, 1, UserFilter.none())).thenReturn(List.of(luffy));
+		when(this.userDirectoryPort.countUsers(UserFilter.none())).thenReturn(37L);
 
-		Page<User> page = this.adminUserQueryService.list(pageable);
+		Page<User> page = this.adminUserQueryService.list(pageable, UserFilter.none());
 
 		assertThat(page.getTotalElements()).isEqualTo(37L);
 		assertThat(page.getContent()).hasSize(1);
+	}
+
+	@Test
+	void passesTheFilterThroughToTheIdentityDirectory() {
+		Pageable pageable = PageRequest.of(0, 20);
+		var filter = new UserFilter("nami", RealmRole.EDITOR, AccountStatus.ACTIVE);
+		List<String> roles = List.of("EDITOR");
+		var nami = new User(LUFFY_ID, "nami", "nami@onepiece.local", AccountStatus.ACTIVE, roles, null);
+		when(this.userDirectoryPort.findUsers(0, 20, filter)).thenReturn(List.of(nami));
+		when(this.userDirectoryPort.countUsers(filter)).thenReturn(1L);
+
+		Page<User> page = this.adminUserQueryService.list(pageable, filter);
+
+		assertThat(page.getContent()).containsExactly(nami);
+		assertThat(page.getTotalElements()).isEqualTo(1L);
 	}
 
 	@Test
