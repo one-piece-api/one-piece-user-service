@@ -41,6 +41,10 @@ public class SecurityConfig {
 
 	private static final String HEALTH_PROBE_PATH = "/actuator/health/**";
 
+	private static final String AUDIT_PATH = "/admin/audit/**";
+
+	private static final String AUDIT_READ_AUTHORITY = PERMISSION_AUTHORITY_PREFIX + "audit:read";
+
 	private static final String ADMIN_PATH = "/admin/**";
 
 	private final ApplicationUserJwtAuthenticationConverter jwtAuthenticationConverter;
@@ -51,6 +55,11 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> {
 				auth.requestMatchers(HEALTH_PROBE_PATH).permitAll();
+				// Ordered before the blanket ADMIN_PATH rule below (Spring evaluates
+				// authorizeHttpRequests matchers first-match-wins): Step 17's audit read
+				// endpoint is the first one gated by a permission authority rather than a
+				// role, per docs/implementation-plan.md.
+				auth.requestMatchers(AUDIT_PATH).hasAuthority(AUDIT_READ_AUTHORITY);
 				auth.requestMatchers(ADMIN_PATH).hasRole("ADMIN");
 				auth.anyRequest().authenticated();
 			})

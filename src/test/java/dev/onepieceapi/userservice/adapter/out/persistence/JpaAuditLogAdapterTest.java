@@ -15,6 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,6 +68,39 @@ class JpaAuditLogAdapterTest {
 			assertThat(entity.getTargetEmail()).isEqualTo("usopp@onepiece.local");
 			assertThat(entity.getOccurredAt()).isEqualTo(occurredAt);
 		});
+	}
+
+	@Test
+	void findsEveryEventNewestFirstWhenNoUserIsGiven() {
+		var actorId = UUID.randomUUID();
+		var targetId = UUID.randomUUID();
+		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T10:00:00Z")));
+		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T11:00:00Z")));
+
+		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, null);
+
+		assertThat(events).extracting(AuditEvent::occurredAt)
+			.containsExactly(Instant.parse("2026-08-23T11:00:00Z"), Instant.parse("2026-08-23T10:00:00Z"));
+		assertThat(this.jpaAuditLogAdapter.countEvents(null)).isEqualTo(2);
+	}
+
+	@Test
+	void findsOnlyTheGivenTargetUsersEvents() {
+		var actorId = UUID.randomUUID();
+		var luffyId = UUID.randomUUID();
+		var namiId = UUID.randomUUID();
+		this.jpaAuditLogAdapter.record(eventAt(actorId, luffyId, Instant.parse("2026-08-23T10:00:00Z")));
+		this.jpaAuditLogAdapter.record(eventAt(actorId, namiId, Instant.parse("2026-08-23T11:00:00Z")));
+
+		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, luffyId);
+
+		assertThat(events).extracting(AuditEvent::targetUserId).containsExactly(luffyId);
+		assertThat(this.jpaAuditLogAdapter.countEvents(luffyId)).isEqualTo(1);
+	}
+
+	private static AuditEvent eventAt(UUID actorId, UUID targetId, Instant occurredAt) {
+		return new AuditEvent(AuditAction.USER_INVITED, actorId, "luffy@onepiece.local", targetId,
+				"usopp@onepiece.local", occurredAt);
 	}
 
 }
