@@ -203,6 +203,22 @@ jobs:
       - name: Inspect image
         run: docker buildx imagetools inspect ghcr.io/one-piece-api/user-service:${{ needs.build-jar.outputs.version }}
 
+  trigger-remote-deploy:
+    name: Trigger remote environment deploy
+    runs-on: ubuntu-latest
+    needs: merge-manifest
+    if: github.event_name == 'push'
+    steps:
+      # onepiece-infrastructure possiede l'unico workflow che sa come
+      # aggiornare l'ambiente remoto (ADR-0005) - niente logica di deploy
+      # duplicata qui, solo la notifica che una nuova immagine è pronta.
+      - name: Notifica onepiece-infrastructure
+        uses: peter-evans/repository-dispatch@v4
+        with:
+          token: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          repository: one-piece-api/onepiece-infrastructure
+          event-type: deploy-remote
+
   cleanup-untagged:
     name: Delete untagged package versions
     runs-on: ubuntu-latest
