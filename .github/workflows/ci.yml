@@ -212,8 +212,33 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
     steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # I sotto-manifest per piattaforma (amd64/arm64) pushati per digest da
+      # "Build and push by digest" non hanno mai un tag proprio - solo
+      # l'indice multi-arch creato da "merge-manifest" li referenzia. GHCR
+      # li riporta quindi come "untagged" esattamente come una versione
+      # davvero orfana: cancellarli tutti rompe il tag che li referenzia
+      # ("manifest unknown" al pull). Si esclude dalla cancellazione ogni
+      # digest ancora referenziato come sotto-manifest da un tag corrente.
       - name: Delete dangling (untagged) versions from GHCR
         run: |
+          set -euo pipefail
+          referenced="$(
+            gh api --paginate "orgs/one-piece-api/packages/container/user-service/versions" \
+              --jq '.[] | select(.metadata.container.tags != []) | .metadata.container.tags[0]' \
+            | while read -r tag; do
+                docker buildx imagetools inspect "ghcr.io/one-piece-api/user-service:$tag" --raw
+              done \
+            | jq -r '.manifests[]?.digest // empty'
+          )"
           gh api --paginate "orgs/one-piece-api/packages/container/user-service/versions" \
-            --jq '.[] | select(.metadata.container.tags == []) | .id' \
-          | xargs -r -I{} gh api --method DELETE "orgs/one-piece-api/packages/container/user-service/versions/{}"
+            --jq '.[] | select(.metadata.container.tags == []) | [.id, .name] | @tsv' \
+          | while IFS=$'\t' read -r id digest; do
+              grep -qxF "$digest" <<< "$referenced" || gh api --method DELETE "orgs/one-piece-api/packages/container/user-service/versions/$id"
+            done
