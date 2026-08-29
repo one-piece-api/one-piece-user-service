@@ -215,9 +215,13 @@ jobs:
       # Chiamata diretta alla REST API invece di peter-evans/repository-dispatch:
       # quell'azione fallisce con "Request body length does not match
       # content-length header" sui runner forzati su Node 24.
+      # -L: l'API GitHub risponde con un redirect 301 verso l'URL canonico
+      # basato sull'ID del repo, che curl non segue di default; --post301
+      # mantiene POST/corpo/header attraverso il redirect invece di
+      # declassare a GET (comportamento di default su 301).
       - name: Notifica onepiece-infrastructure
         run: |
-          curl -sf -X POST \
+          curl -sf -L --post301 -X POST \
             -H "Authorization: Bearer ${{ secrets.INFRA_DISPATCH_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/one-piece-api/onepiece-infrastructure/dispatches \
