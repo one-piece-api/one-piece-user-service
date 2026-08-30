@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -30,8 +29,8 @@ class AdminAuditController {
 	private final AdminAuditQueryService adminAuditQueryService;
 
 	@GetMapping("/admin/audit")
-	PageResponse<AuditEventResponse> listAuditEvents(Pageable pageable, @RequestParam Optional<UUID> userId) {
-		Page<AuditEventResponse> page = this.adminAuditQueryService.list(pageable, userId.orElse(null))
+	PageResponse<AuditEventResponse> listAuditEvents(Pageable pageable, @RequestParam(required = false) UUID userId) {
+		Page<AuditEventResponse> page = this.adminAuditQueryService.list(pageable, userId)
 			.map(AuditEventResponseMapper::toResponse);
 		return PageResponse.from(page);
 	}
