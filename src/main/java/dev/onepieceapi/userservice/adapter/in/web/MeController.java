@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 class MeController {
 
-	@GetMapping("/me")
+	@GetMapping(ApiPaths.ME)
 	MeResponse me(@AuthenticationPrincipal User user, Authentication authentication) {
 		return new MeResponse(user.username(), user.email(), user.roles(), permissionsOf(authentication));
 	}

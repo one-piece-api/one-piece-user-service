@@ -1,5 +1,9 @@
 # ADR-0007: Permissions as Keycloak Composite/Client Roles
 
+> Permission-based gating (this ADR's model) is completed for every endpoint, and the
+> `/admin` path prefix removed, by
+> [ADR-0009](0009-permission-based-endpoint-registry.md).
+
 ## Context
 
 The application is evolving from "role name is the only unit of authorization" (today:

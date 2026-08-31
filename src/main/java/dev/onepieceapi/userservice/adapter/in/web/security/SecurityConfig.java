@@ -18,6 +18,10 @@ import org.springframework.security.web.SecurityFilterChain;
  * rejecting a DISABLED user even with an otherwise still-valid token, while authorities
  * are built from the token's own "realm_access.roles" claim, which Keycloak recomputes on
  * every issuance.
+ * <p>
+ * Endpoint-level authorization is driven entirely by {@link SecuredEndpoint} - every
+ * secured path's method, path and required permission live there, not as ad hoc rules
+ * here; see {@code docs/adr/0009-permission-based-endpoint-registry.md}.
  */
 @Configuration
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -39,14 +43,6 @@ public class SecurityConfig {
 	 */
 	public static final String PERMISSION_AUTHORITY_PREFIX = "PERMISSION_";
 
-	private static final String HEALTH_PROBE_PATH = "/actuator/health/**";
-
-	private static final String AUDIT_PATH = "/admin/audit/**";
-
-	private static final String AUDIT_READ_AUTHORITY = PERMISSION_AUTHORITY_PREFIX + "audit:read";
-
-	private static final String ADMIN_PATH = "/admin/**";
-
 	private final ApplicationUserJwtAuthenticationConverter jwtAuthenticationConverter;
 
 	@Bean
@@ -54,13 +50,12 @@ public class SecurityConfig {
 		http.csrf(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> {
-				auth.requestMatchers(HEALTH_PROBE_PATH).permitAll();
-				// Ordered before the blanket ADMIN_PATH rule below (Spring evaluates
-				// authorizeHttpRequests matchers first-match-wins): Step 17's audit read
-				// endpoint is the first one gated by a permission authority rather than a
-				// role, per docs/implementation-plan.md.
-				auth.requestMatchers(AUDIT_PATH).hasAuthority(AUDIT_READ_AUTHORITY);
-				auth.requestMatchers(ADMIN_PATH).hasRole("ADMIN");
+				SecuredEndpoint.configureAll(auth);
+				// Backstop only: every real endpoint is enumerated in SecuredEndpoint, so
+				// this covers anything not yet added to it (e.g. Spring Boot's internal
+				// "/error" forward) - authenticated, not denyAll, to avoid turning a
+				// plain
+				// 404/500 into a confusing 403 for those edge cases.
 				auth.anyRequest().authenticated();
 			})
 			.oauth2ResourceServer(oauth2 -> oauth2.jwt(this::configureJwt));

@@ -38,8 +38,9 @@ import java.util.UUID;
 /**
  * The user listing and single-user lookup from UF-IDU-17, the invite endpoint from
  * UF-IDU-01, the resend endpoint from UF-IDU-03, the role assign/revoke endpoints from
- * UF-IDU-15/16, and the revoke-access/reactivate endpoints from UF-IDU-13/14. ADMIN-only
- * access is enforced in {@code SecurityConfig} ("/admin/**"), not here.
+ * UF-IDU-15/16, and the revoke-access/reactivate endpoints from UF-IDU-13/14. Access is
+ * enforced per-endpoint by permission authority, not here - see
+ * {@code security.SecuredEndpoint}.
  */
 @RestController
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -58,7 +59,7 @@ class AdminUserController {
 	 * combination, or none for the original unfiltered page. See
 	 * {@code UserDirectoryPort#findUsers} for how a non-empty filter is resolved.
 	 */
-	@GetMapping("/admin/users")
+	@GetMapping(ApiPaths.USERS)
 	PageResponse<UserSummaryResponse> listUsers(Pageable pageable, @RequestParam Optional<String> q,
 			@RequestParam Optional<RealmRole> role, @RequestParam Optional<AccountStatus> status) {
 		var filter = new UserFilter(q.orElse(null), role.orElse(null), status.orElse(null));
@@ -67,7 +68,7 @@ class AdminUserController {
 		return PageResponse.from(page);
 	}
 
-	@GetMapping("/admin/users/{userId}")
+	@GetMapping(ApiPaths.USER_BY_ID)
 	UserSummaryResponse getUser(@PathVariable UUID userId) {
 		return UserSummaryResponseMapper.toResponse(this.adminUserQueryService.getUser(userId));
 	}
@@ -78,7 +79,7 @@ class AdminUserController {
 	 * "Roles &amp; Permissions" panel and lets the frontend compute any user's effective
 	 * permissions client-side from their roles, without a per-user server call.
 	 */
-	@GetMapping("/admin/roles")
+	@GetMapping(ApiPaths.ROLES)
 	List<RolePermissionsResponse> listRoles() {
 		Map<RealmRole, List<String>> rolePermissions = this.adminUserQueryService.listRolePermissions();
 		return rolePermissions.entrySet()
@@ -88,40 +89,40 @@ class AdminUserController {
 			.toList();
 	}
 
-	@PostMapping("/admin/users")
+	@PostMapping(ApiPaths.USERS)
 	ResponseEntity<UserSummaryResponse> inviteUser(@Valid @RequestBody InviteUserRequest request,
 			@AuthenticationPrincipal User user) {
 		var invited = this.adminUserInvitationService.invite(request.email(), request.roles(), user);
 		return ResponseEntity.status(HttpStatus.CREATED).body(UserSummaryResponseMapper.toResponse(invited));
 	}
 
-	@PostMapping("/admin/users/{userId}/resend-invitation")
+	@PostMapping(ApiPaths.USER_RESEND_INVITATION)
 	UserSummaryResponse resendInvitation(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
 		var target = this.adminUserInvitationService.resend(userId, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
-	@PutMapping("/admin/users/{userId}/roles/{role}")
+	@PutMapping(ApiPaths.USER_ROLE)
 	UserSummaryResponse assignRole(@PathVariable UUID userId, @PathVariable RealmRole role,
 			@AuthenticationPrincipal User user) {
 		var target = this.adminUserRoleService.assignRole(userId, role, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
-	@DeleteMapping("/admin/users/{userId}/roles/{role}")
+	@DeleteMapping(ApiPaths.USER_ROLE)
 	UserSummaryResponse revokeRole(@PathVariable UUID userId, @PathVariable RealmRole role,
 			@AuthenticationPrincipal User user) {
 		var target = this.adminUserRoleService.revokeRole(userId, role, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
-	@PostMapping("/admin/users/{userId}/revoke-access")
+	@PostMapping(ApiPaths.USER_REVOKE_ACCESS)
 	UserSummaryResponse revokeAccess(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
 		var target = this.adminUserAccessService.revokeAccess(userId, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
-	@PostMapping("/admin/users/{userId}/reactivate")
+	@PostMapping(ApiPaths.USER_REACTIVATE)
 	UserSummaryResponse reactivate(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
 		var target = this.adminUserAccessService.reactivate(userId, user);
 		return UserSummaryResponseMapper.toResponse(target);

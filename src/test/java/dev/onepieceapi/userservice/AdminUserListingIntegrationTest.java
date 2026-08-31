@@ -34,10 +34,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Exercises the ADMIN user listing (UF-IDU-17) and invite endpoint (UF-IDU-01) against a
  * real Keycloak (Testcontainers), not Mockito mocks: the full security filter chain
  * (including the "sub"-based {@code ApplicationUserJwtAuthenticationConverter} resolution
- * and the "/admin/**" -&gt; hasRole("ADMIN") rule) and the real Admin REST API call chain
- * in {@code KeycloakUserDirectoryAdapter} all run against a dedicated realm imported just
- * for this test. A real Postgres (Testcontainers) backs the audit log the invite endpoint
- * writes to.
+ * and {@code SecuredEndpoint}'s permission-authority rules, proven here against real
+ * composite-role-derived JWTs rather than mocked authorities) and the real Admin REST API
+ * call chain in {@code KeycloakUserDirectoryAdapter} all run against a dedicated realm
+ * imported just for this test. A real Postgres (Testcontainers) backs the audit log the
+ * invite endpoint writes to.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
@@ -87,7 +88,7 @@ class AdminUserListingIntegrationTest {
 	@Test
 	void anAdminSeesTheRealCrewWithoutTheAutoAssignedDefaultRole() {
 		this.restTestClient.get()
-			.uri("/admin/users")
+			.uri("/users")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
 			.exchange()
 			.expectStatus()
@@ -140,7 +141,7 @@ class AdminUserListingIntegrationTest {
 	@Test
 	void anAdminCanListTheRolePermissionRegistry() {
 		this.restTestClient.get()
-			.uri("/admin/roles")
+			.uri("/roles")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
 			.exchange()
 			.expectStatus()
@@ -155,7 +156,7 @@ class AdminUserListingIntegrationTest {
 	@Test
 	void aNonAdminCannotListTheRolePermissionRegistry() {
 		this.restTestClient.get()
-			.uri("/admin/roles")
+			.uri("/roles")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
 			.exchange()
 			.expectStatus()
@@ -165,7 +166,7 @@ class AdminUserListingIntegrationTest {
 	@Test
 	void aNonAdminIsForbidden() {
 		this.restTestClient.get()
-			.uri("/admin/users")
+			.uri("/users")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
 			.exchange()
 			.expectStatus()
@@ -175,7 +176,7 @@ class AdminUserListingIntegrationTest {
 	@Test
 	void anAdminCanInviteANewUser() throws Exception {
 		this.restTestClient.post()
-			.uri("/admin/users")
+			.uri("/users")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
 			.contentType(MediaType.APPLICATION_JSON)
 			.body("""
@@ -198,7 +199,7 @@ class AdminUserListingIntegrationTest {
 	@Test
 	void invitingAnAlreadyRegisteredEmailIsRejected() {
 		this.restTestClient.post()
-			.uri("/admin/users")
+			.uri("/users")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
 			.contentType(MediaType.APPLICATION_JSON)
 			.body("""
@@ -216,7 +217,7 @@ class AdminUserListingIntegrationTest {
 	@Test
 	void aNonAdminCannotInviteAUser() {
 		this.restTestClient.post()
-			.uri("/admin/users")
+			.uri("/users")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
 			.contentType(MediaType.APPLICATION_JSON)
 			.body("""
@@ -233,7 +234,7 @@ class AdminUserListingIntegrationTest {
 		String luffyId = userIdOf("luffy", adminToken);
 
 		this.restTestClient.get()
-			.uri("/admin/users/" + luffyId)
+			.uri("/users/" + luffyId)
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -249,7 +250,7 @@ class AdminUserListingIntegrationTest {
 		String zoroId = inviteAndGetUserId("zoro@onepiece.local", "EDITOR", adminToken);
 
 		String afterGrant = this.restTestClient.put()
-			.uri("/admin/users/" + zoroId + "/roles/ADMIN")
+			.uri("/users/" + zoroId + "/roles/ADMIN")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -260,7 +261,7 @@ class AdminUserListingIntegrationTest {
 		assertThat(afterGrant).contains("\"EDITOR\"").contains("\"ADMIN\"");
 
 		String afterRevoke = this.restTestClient.delete()
-			.uri("/admin/users/" + zoroId + "/roles/ADMIN")
+			.uri("/users/" + zoroId + "/roles/ADMIN")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -277,7 +278,7 @@ class AdminUserListingIntegrationTest {
 		String chopperId = inviteAndGetUserId("chopper@onepiece.local", "EDITOR", adminToken);
 
 		String body = this.restTestClient.delete()
-			.uri("/admin/users/" + chopperId + "/roles/EDITOR")
+			.uri("/users/" + chopperId + "/roles/EDITOR")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -298,7 +299,7 @@ class AdminUserListingIntegrationTest {
 		String luffyId = userIdOf("luffy", adminToken);
 
 		this.restTestClient.delete()
-			.uri("/admin/users/" + luffyId + "/roles/ADMIN")
+			.uri("/users/" + luffyId + "/roles/ADMIN")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -314,7 +315,7 @@ class AdminUserListingIntegrationTest {
 		String sanjiId = inviteAndGetUserId("sanji@onepiece.local", "EDITOR", adminToken);
 
 		String afterRevoke = this.restTestClient.post()
-			.uri("/admin/users/" + sanjiId + "/revoke-access")
+			.uri("/users/" + sanjiId + "/revoke-access")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -325,7 +326,7 @@ class AdminUserListingIntegrationTest {
 		assertThat(afterRevoke).contains("\"status\":\"DISABLED\"");
 
 		String afterReactivate = this.restTestClient.post()
-			.uri("/admin/users/" + sanjiId + "/reactivate")
+			.uri("/users/" + sanjiId + "/reactivate")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -346,7 +347,7 @@ class AdminUserListingIntegrationTest {
 		String luffyId = userIdOf("luffy", adminToken);
 
 		this.restTestClient.post()
-			.uri("/admin/users/" + luffyId + "/revoke-access")
+			.uri("/users/" + luffyId + "/revoke-access")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()
@@ -361,7 +362,7 @@ class AdminUserListingIntegrationTest {
 		String luffyId = userIdOf("luffy", tokenFor("luffy", "luffy-pass"));
 
 		this.restTestClient.post()
-			.uri("/admin/users/" + luffyId + "/revoke-access")
+			.uri("/users/" + luffyId + "/revoke-access")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
 			.exchange()
 			.expectStatus()
@@ -373,7 +374,7 @@ class AdminUserListingIntegrationTest {
 		String luffyId = userIdOf("luffy", tokenFor("luffy", "luffy-pass"));
 
 		this.restTestClient.put()
-			.uri("/admin/users/" + luffyId + "/roles/EDITOR")
+			.uri("/users/" + luffyId + "/roles/EDITOR")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
 			.exchange()
 			.expectStatus()
@@ -382,7 +383,7 @@ class AdminUserListingIntegrationTest {
 
 	private String inviteAndGetUserId(String email, String role, String adminToken) {
 		String body = this.restTestClient.post()
-			.uri("/admin/users")
+			.uri("/users")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.contentType(MediaType.APPLICATION_JSON)
 			.body("{\"email\": \"" + email + "\", \"roles\": [\"" + role + "\"]}")
@@ -397,7 +398,7 @@ class AdminUserListingIntegrationTest {
 
 	private String userIdOf(String username, String adminToken) {
 		String body = this.restTestClient.get()
-			.uri("/admin/users?size=50")
+			.uri("/users?size=50")
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.exchange()
 			.expectStatus()

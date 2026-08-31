@@ -32,11 +32,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Imports the real {@link SecurityConfig} specifically to prove {@code GET /admin/audit}
- * is gated by the {@code audit:read} permission authority, not the blanket
- * {@code hasRole("ADMIN")} rule the rest of "/admin/**" relies on - see
+ * Imports the real {@link SecurityConfig} specifically to prove {@code GET /audit} is
+ * gated by the {@code audit:read} permission authority - see
  * {@code docs/implementation-plan.md}'s Step 17 and {@link AdminUserControllerTest} for
- * the equivalent role-based coverage.
+ * the equivalent coverage of the other permission-gated endpoints.
  */
 @WebMvcTest(AdminAuditController.class)
 @Import({ SecurityConfig.class, ApplicationExceptionHandler.class })
@@ -54,19 +53,19 @@ class AdminAuditControllerTest {
 				UUID.randomUUID(), "usopp@onepiece.local", Instant.EPOCH);
 		when(this.adminAuditQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(event)));
 
-		var request = get("/admin/audit").with(asUserWithAuthorities("PERMISSION_audit:read"));
+		var request = get("/audit").with(asUserWithAuthorities("PERMISSION_audit:read"));
 		this.mockMvc.perform(request).andExpect(status().isOk());
 	}
 
 	@Test
 	void anAdminRoleAloneWithoutTheAuditReadPermissionIsForbidden() throws Exception {
-		var request = get("/admin/audit").with(asUserWithAuthorities("ROLE_ADMIN"));
+		var request = get("/audit").with(asUserWithAuthorities("ROLE_ADMIN"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 
 	@Test
 	void aCallerWithNoRelevantAuthorityIsForbidden() throws Exception {
-		var request = get("/admin/audit").with(asUserWithAuthorities("PERMISSION_docs:read"));
+		var request = get("/audit").with(asUserWithAuthorities("PERMISSION_docs:read"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 
