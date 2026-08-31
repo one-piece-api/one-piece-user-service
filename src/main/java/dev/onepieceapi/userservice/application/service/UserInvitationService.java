@@ -5,7 +5,6 @@ import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,18 +20,14 @@ import java.util.UUID;
  * for one invitation. Not wrapped in a single transaction: Keycloak provisioning isn't a
  * participant in the local database's transaction, so there is no atomicity to buy - the
  * identity provider call happens first (its own single source of truth for "does this
- * user exist"), and only once it succeeds is the audit record written. If that write
- * fails, the invitation is rolled back ({@link UserDirectoryPort#rollbackInvitation}) so
- * the operation is all-or-nothing from the caller's perspective, rather than leaving a
- * real invitation with no audit trail.
+ * user exist"), and only once it succeeds is the audit record written. Like every other
+ * mutating service in this package, an audit-write failure here is logged and rethrown by
+ * the caller, not compensated for by undoing the change that was already made.
  * <p>
- * Also handles resending an invitation (UF-IDU-03): unlike a fresh invite, there is
- * nothing to compensate if the audit write fails - the account already existed and the
- * email was already re-sent, so a failure here is logged and rethrown, not rolled back.
+ * Also handles resending an invitation (UF-IDU-03), which follows the same pattern.
  */
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
-@Slf4j
 public class UserInvitationService {
 
 	private final UserDirectoryPort userDirectoryPort;
@@ -43,15 +38,7 @@ public class UserInvitationService {
 
 	public User invite(String email, Set<RealmRole> roles, User actor) {
 		User invited = this.userDirectoryPort.inviteUser(email, roles);
-
-		try {
-			this.auditLogPort.record(AuditEventMapper.userInvited(actor, invited, Instant.now(this.clock)));
-		}
-		catch (RuntimeException ex) {
-			rollBackInvitation(invited, ex);
-			throw ex;
-		}
-
+		this.auditLogPort.record(AuditEventMapper.userInvited(actor, invited, Instant.now(this.clock)));
 		return invited;
 	}
 
@@ -59,18 +46,6 @@ public class UserInvitationService {
 		User target = this.userDirectoryPort.resendInvitation(userId);
 		this.auditLogPort.record(AuditEventMapper.invitationResent(actor, target, Instant.now(this.clock)));
 		return target;
-	}
-
-	private void rollBackInvitation(User invited, RuntimeException cause) {
-		try {
-			this.userDirectoryPort.rollbackInvitation(invited.userId());
-		}
-		catch (RuntimeException cleanupFailure) {
-			String message = "Failed to roll back invitation for {} - manual cleanup needed";
-			log.error(message, invited.userId(), cleanupFailure);
-			return;
-		}
-		log.warn("Rolled back invitation for {} after audit write failure", invited.userId(), cause);
 	}
 
 }

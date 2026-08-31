@@ -293,16 +293,6 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	}
 
 	@Override
-	public void rollbackInvitation(UUID userId) {
-		try {
-			getRealm().users().get(userId.toString()).remove();
-		}
-		catch (RuntimeException ex) {
-			throw new KeycloakCommunicationException("Failed to remove Keycloak user " + userId, ex);
-		}
-	}
-
-	@Override
 	public User resendInvitation(UUID userId) {
 		UsersResource users = getRealm().users();
 		User user = loadUser(users, userId);
@@ -492,7 +482,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 
 	private void deleteUser(String keycloakId, RuntimeException cause) {
 		try {
-			rollbackInvitation(UUID.fromString(keycloakId));
+			getRealm().users().get(keycloakId).remove();
 		}
 		catch (RuntimeException cleanupFailure) {
 			String message = "Failed to roll back Keycloak user {} - manual cleanup needed";

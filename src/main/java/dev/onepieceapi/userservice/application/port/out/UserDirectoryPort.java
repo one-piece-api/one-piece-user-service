@@ -52,15 +52,6 @@ public interface UserDirectoryPort {
 	User inviteUser(String email, Set<RealmRole> roles);
 
 	/**
-	 * Compensating action for a failed invitation (UF-IDU-01): removes an identity that
-	 * {@link #inviteUser} provisioned but the invitation could not be completed for (e.g.
-	 * the audit record failed to persist) - restores "no account exists for this email"
-	 * so the operation is all-or-nothing from the caller's perspective. Never used for
-	 * anything else - revoking an activated user is UF-IDU-13 (disable, not delete).
-	 */
-	void rollbackInvitation(UUID userId);
-
-	/**
 	 * Re-triggers the identity provider's own invitation email for an account whose
 	 * current invitation has gone stale
 	 * ({@link dev.onepieceapi.userservice.domain.AccountStatus#INVITATION_EXPIRED},

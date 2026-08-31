@@ -27,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -93,32 +92,15 @@ class UserInvitationServiceTest {
 			.isInstanceOf(RuntimeException.class);
 
 		verifyNoInteractions(this.auditLogPort);
-		verify(this.userDirectoryPort, never()).rollbackInvitation(any());
 	}
 
 	@Test
-	void rollsBackTheInvitationWhenTheAuditWriteFails() {
+	void propagatesTheFailureWhenTheAuditWriteFails() {
 		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
 		var invited = pendingInvitedUser();
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 		var auditFailure = new RuntimeException("Postgres unreachable");
 		doThrow(auditFailure).when(this.auditLogPort).record(any());
-		ThrowingCallable invite = () -> this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
-
-		assertThatThrownBy(invite).isSameAs(auditFailure);
-
-		verify(this.userDirectoryPort).rollbackInvitation(INVITED_ID);
-	}
-
-	@Test
-	void stillPropagatesTheOriginalFailureWhenRollingBackItselfFails() {
-		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
-		var invited = pendingInvitedUser();
-		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
-		var auditFailure = new RuntimeException("Postgres unreachable");
-		doThrow(auditFailure).when(this.auditLogPort).record(any());
-		doThrow(new RuntimeException("Keycloak unreachable")).when(this.userDirectoryPort)
-			.rollbackInvitation(INVITED_ID);
 		ThrowingCallable invite = () -> this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
 
 		assertThatThrownBy(invite).isSameAs(auditFailure);

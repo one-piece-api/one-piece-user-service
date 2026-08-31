@@ -334,18 +334,6 @@ class KeycloakUserDirectoryAdapterTest {
 	}
 
 	@Test
-	void wrapsAKeycloakFailureWhenRollingBackAnInvitation() {
-		var userResource = mock(UserResource.class);
-		when(this.usersResource.get(NAMI_ID)).thenReturn(userResource);
-		doThrow(new RuntimeException("Keycloak unreachable")).when(userResource).remove();
-
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.rollbackInvitation(UUID.fromString(NAMI_ID)))
-			.isInstanceOf(KeycloakCommunicationException.class)
-			.cause()
-			.hasMessage("Keycloak unreachable");
-	}
-
-	@Test
 	void invitesAUserWithNoUsableCredentialAndTheChosenRoles() {
 		var response = Response.status(Response.Status.CREATED)
 			.location(URI.create("http://keycloak/admin/realms/onepiece/users/" + NAMI_ID))
@@ -425,16 +413,6 @@ class KeycloakUserDirectoryAdapterTest {
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
 			.isInstanceOf(EmailDeliveryFailedException.class)
 			.hasMessageContaining(INVITED_EMAIL);
-
-		verify(userResource).remove();
-	}
-
-	@Test
-	void rollbackInvitationRemovesTheKeycloakUser() {
-		var userResource = mock(UserResource.class);
-		when(this.usersResource.get(NAMI_ID)).thenReturn(userResource);
-
-		this.keycloakUserDirectoryAdapter.rollbackInvitation(UUID.fromString(NAMI_ID));
 
 		verify(userResource).remove();
 	}
