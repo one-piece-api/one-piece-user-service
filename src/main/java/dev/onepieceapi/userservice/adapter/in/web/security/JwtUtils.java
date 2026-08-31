@@ -32,26 +32,25 @@ public class JwtUtils {
 		return claim;
 	}
 
-	public List<String> getNestedStringListClaim(Jwt jwt, String parentClaim, String childClaim) {
-		Map<String, Object> parent = jwt.getClaimAsMap(parentClaim);
+	/**
+	 * Walks {@code path} as successive nested-map keys from the token's top-level claims
+	 * (e.g. {@code "realm_access", "roles"} for {@code realm_access.roles}, or
+	 * {@code "resource_access", clientId, "roles"} for a client's
+	 * {@code resource_access.<clientId>.roles}) and returns the string list found at that
+	 * path, or an empty list if any step along the way is missing or not shaped as
+	 * expected.
+	 */
+	public List<String> getNestedStringListClaim(Jwt jwt, String... path) {
+		Object current = jwt.getClaims();
 
-		if (parent == null || !(parent.get(childClaim) instanceof List<?> values)) {
-			return List.of();
+		for (String key : path) {
+			if (!(current instanceof Map<?, ?> map)) {
+				return List.of();
+			}
+			current = map.get(key);
 		}
 
-		return values.stream().filter(String.class::isInstance).map(String.class::cast).toList();
-	}
-
-	/**
-	 * Reads the OIDC-standard {@code resource_access.<clientId>.roles} claim - a client's
-	 * roles, one level deeper than {@link #getNestedStringListClaim}'s parent/child shape
-	 * handles.
-	 */
-	public List<String> getResourceAccessClientRolesClaim(Jwt jwt, String clientId) {
-		Map<String, Object> resourceAccess = jwt.getClaimAsMap("resource_access");
-
-		if (resourceAccess == null || !(resourceAccess.get(clientId) instanceof Map<?, ?> clientAccess)
-				|| !(clientAccess.get("roles") instanceof List<?> values)) {
+		if (!(current instanceof List<?> values)) {
 			return List.of();
 		}
 

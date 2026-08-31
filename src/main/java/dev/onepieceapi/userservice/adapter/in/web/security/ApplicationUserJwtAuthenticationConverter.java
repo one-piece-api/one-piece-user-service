@@ -44,10 +44,9 @@ import java.util.stream.Stream;
  * Permissions (see {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}) are
  * read the same way from {@code resource_access.onepiece-proxy.roles} - Keycloak expands
  * a role's composite client-roles into this claim automatically, so no extra lookup is
- * needed here either. They are exposed only as {@code PERMISSION_}-prefixed authorities,
- * not on {@link User} itself: unlike roles, permissions are meaningful only for the
- * caller's own token, never for another user looked up through the Admin API (see
- * {@code MeController}, the only place they are read back out).
+ * needed here either. They are exposed only as
+ * {@link Permission#AUTHORITY_PREFIX}-prefixed authorities, not on {@link User} itself -
+ * see {@link Permission#allFrom} for where and why they are read back out.
  */
 @Component
 class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
@@ -58,18 +57,31 @@ class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, Abstra
 
 	private static final String REALM_ACCESS_CLAIM = "realm_access";
 
-	private static final String REALM_ROLES_CLAIM = "roles";
+	private static final String RESOURCE_ACCESS_CLAIM = "resource_access";
+
+	/**
+	 * The key holding a role-name list under both {@link #REALM_ACCESS_CLAIM} and a
+	 * {@link #RESOURCE_ACCESS_CLAIM} client entry.
+	 */
+	private static final String ROLES_CLAIM = "roles";
 
 	/** The Keycloak client whose roles this application treats as permissions. */
 	private static final String PERMISSIONS_CLIENT_ID = "onepiece-proxy";
+
+	/**
+	 * The Spring Security convention {@code hasRole(...)} relies on: it checks for a
+	 * {@code GrantedAuthority} named "ROLE_" + the role.
+	 */
+	private static final String ROLE_AUTHORITY_PREFIX = "ROLE_";
 
 	@Override
 	public AbstractAuthenticationToken convert(Jwt jwt) {
 		UUID userId = JwtUtils.getRequiredUuidClaim(jwt, JwtClaimNames.SUB);
 		String username = JwtUtils.getRequiredStringClaim(jwt, USERNAME_CLAIM);
 		String email = JwtUtils.getRequiredStringClaim(jwt, EMAIL_CLAIM);
-		List<String> roles = JwtUtils.getNestedStringListClaim(jwt, REALM_ACCESS_CLAIM, REALM_ROLES_CLAIM);
-		List<String> permissions = JwtUtils.getResourceAccessClientRolesClaim(jwt, PERMISSIONS_CLIENT_ID);
+		var roles = JwtUtils.getNestedStringListClaim(jwt, REALM_ACCESS_CLAIM, ROLES_CLAIM);
+		var permissions = JwtUtils.getNestedStringListClaim(jwt, RESOURCE_ACCESS_CLAIM, PERMISSIONS_CLIENT_ID,
+				ROLES_CLAIM);
 
 		User user = new User(userId, username, email, AccountStatus.ACTIVE, roles, null);
 
@@ -78,8 +90,8 @@ class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, Abstra
 
 	private static Set<SimpleGrantedAuthority> authorities(List<String> roles, List<String> permissions) {
 		Stream<SimpleGrantedAuthority> roleAuthorities = roles.stream()
-			.map(role -> new SimpleGrantedAuthority(SecurityConfig.ROLE_AUTHORITY_PREFIX + role));
-		String permissionPrefix = SecurityConfig.PERMISSION_AUTHORITY_PREFIX;
+			.map(role -> new SimpleGrantedAuthority(ROLE_AUTHORITY_PREFIX + role));
+		String permissionPrefix = Permission.AUTHORITY_PREFIX;
 		Stream<SimpleGrantedAuthority> permissionAuthorities = permissions.stream()
 			.map(permission -> new SimpleGrantedAuthority(permissionPrefix + permission));
 		return Stream.concat(roleAuthorities, permissionAuthorities).collect(Collectors.toSet());
