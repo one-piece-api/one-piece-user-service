@@ -37,22 +37,23 @@ class AuditLogEntity {
 	@Column(nullable = false)
 	private String actorEmail;
 
-	@Column(nullable = false)
 	private UUID targetUserId;
 
-	@Column(nullable = false)
 	private String targetEmail;
+
+	private String targetLabel;
 
 	@Column(nullable = false)
 	private Instant occurredAt;
 
 	AuditLogEntity(String action, UUID actorUserId, String actorEmail, UUID targetUserId, String targetEmail,
-			Instant occurredAt) {
+			String targetLabel, Instant occurredAt) {
 		this.action = action;
 		this.actorUserId = actorUserId;
 		this.actorEmail = actorEmail;
 		this.targetUserId = targetUserId;
 		this.targetEmail = targetEmail;
+		this.targetLabel = targetLabel;
 		this.occurredAt = occurredAt;
 	}
 

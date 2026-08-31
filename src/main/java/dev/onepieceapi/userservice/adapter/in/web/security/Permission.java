@@ -26,6 +26,8 @@ public enum Permission {
 
 	ROLES_ASSIGN("roles:assign"),
 
+	ROLES_MANAGE("roles:manage"),
+
 	ACCESS_WRITE("access:write"),
 
 	AUDIT_READ("audit:read");

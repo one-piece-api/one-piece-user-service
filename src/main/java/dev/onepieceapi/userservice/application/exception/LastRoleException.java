@@ -1,7 +1,6 @@
 package dev.onepieceapi.userservice.application.exception;
 
 import dev.onepieceapi.exception.ConflictException;
-import dev.onepieceapi.userservice.domain.RealmRole;
 
 import java.util.UUID;
 
@@ -11,11 +10,11 @@ import java.util.UUID;
  */
 public class LastRoleException extends ConflictException {
 
-	public LastRoleException(UUID userId, RealmRole role) {
+	public LastRoleException(UUID userId, String role) {
 		super(UserErrorCode.LAST_ROLE, message(userId, role));
 	}
 
-	private static String message(UUID userId, RealmRole role) {
+	private static String message(UUID userId, String role) {
 		return "Cannot remove " + role + " from " + userId + " - at least one role must remain assigned";
 	}
 

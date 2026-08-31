@@ -24,7 +24,7 @@ class AuditLogFailureLoggingDecoratorTest {
 	private static final Instant OCCURRED_AT = Instant.parse("2026-08-25T10:00:00Z");
 
 	private static final AuditEvent EVENT = new AuditEvent(AuditAction.ACCESS_REVOKED, UUID.randomUUID(),
-			"luffy@onepiece.local", UUID.randomUUID(), "usopp@onepiece.local", OCCURRED_AT);
+			"luffy@onepiece.local", UUID.randomUUID(), "usopp@onepiece.local", null, OCCURRED_AT);
 
 	@Mock
 	private JpaAuditLogAdapter delegate;

@@ -6,8 +6,9 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
  * {@link dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException}
  * for a 409) - connectivity failures, unexpected responses, anything the
  * {@code keycloak-admin-client}/JAX-RS layer throws. Without this, those library-specific
- * exception types would cross {@link KeycloakUserDirectoryAdapter} and leak into the rest
- * of the codebase, defeating the point of it being the only place that talks to Keycloak.
+ * exception types would cross {@link KeycloakUserDirectoryAdapter}/
+ * {@link KeycloakRoleDirectoryAdapter} and leak into the rest of the codebase, defeating
+ * the point of confining Keycloak-specific types to this package.
  *
  * <p>
  * Deliberately a plain unchecked exception, not a {@code one-piece-exception}

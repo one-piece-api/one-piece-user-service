@@ -9,7 +9,7 @@ public class AuditEventResponseMapper {
 
 	public AuditEventResponse toResponse(AuditEvent event) {
 		return new AuditEventResponse(event.action().name(), event.actorUserId(), event.actorEmail(),
-				event.targetUserId(), event.targetEmail(), event.occurredAt());
+				event.targetUserId(), event.targetEmail(), event.targetLabel(), event.occurredAt());
 	}
 
 }

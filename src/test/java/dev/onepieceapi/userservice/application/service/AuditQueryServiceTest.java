@@ -75,7 +75,7 @@ class AuditQueryServiceTest {
 
 	private static AuditEvent anEvent() {
 		return new AuditEvent(AuditAction.USER_INVITED, ACTOR_ID, "luffy@onepiece.local", TARGET_ID,
-				"usopp@onepiece.local", Instant.parse("2026-08-23T10:00:00Z"));
+				"usopp@onepiece.local", null, Instant.parse("2026-08-23T10:00:00Z"));
 	}
 
 }

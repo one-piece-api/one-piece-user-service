@@ -1,5 +1,10 @@
 # ADR-0011: `roles:read` Permission, Rename `roles:write` to `roles:assign`
 
+> The "roles are fixed... edited only through Keycloak itself" framing below is
+> superseded by [ADR-0012](0012-role-permission-catalog-management.md): roles become
+> fully dynamic, and a new `roles:manage` permission (added alongside `roles:read`/
+> `roles:assign` here) gates creating/deleting roles and permissions in-app.
+
 ## Context
 
 Two problems surfaced in ADR-0007's original permission mapping once every endpoint was

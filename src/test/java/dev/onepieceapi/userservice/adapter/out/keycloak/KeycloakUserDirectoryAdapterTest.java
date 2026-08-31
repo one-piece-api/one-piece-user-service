@@ -9,7 +9,6 @@ import dev.onepieceapi.userservice.application.exception.LastAdministratorExcept
 import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.domain.AccountStatus;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
 import jakarta.ws.rs.NotFoundException;
@@ -39,14 +38,11 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -267,7 +263,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(roleResource.getUserMembers(0, 500)).thenReturn(List.of(luffy));
 		mockRoles(LUFFY_ID, "ADMIN");
 
-		var filter = new UserFilter(null, RealmRole.ADMIN, null);
+		var filter = new UserFilter(null, "ADMIN", null);
 		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, filter);
 
 		assertThat(users).extracting(User::userId).containsExactly(UUID.fromString(LUFFY_ID));
@@ -302,7 +298,7 @@ class KeycloakUserDirectoryAdapterTest {
 		mockRoles(LUFFY_ID, "EDITOR");
 		mockRoles(NAMI_ID, "EDITOR");
 
-		var filter = new UserFilter("nami", RealmRole.EDITOR, null);
+		var filter = new UserFilter("nami", "EDITOR", null);
 		List<User> users = this.keycloakUserDirectoryAdapter.findUsers(0, 10, filter);
 
 		assertThat(users).extracting(User::userId).containsExactly(UUID.fromString(NAMI_ID));
@@ -324,7 +320,7 @@ class KeycloakUserDirectoryAdapterTest {
 	@Test
 	void wrapsAKeycloakFailureWhenCreatingTheAccountItself() {
 		when(this.usersResource.create(any())).thenThrow(new RuntimeException("Keycloak unreachable"));
-		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+		Set<String> roles = Set.of("EDITOR");
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
 			.isInstanceOf(KeycloakCommunicationException.class)
@@ -348,7 +344,7 @@ class KeycloakUserDirectoryAdapterTest {
 		var rolesResource = mock(RolesResource.class);
 		when(this.realmResource.roles()).thenReturn(rolesResource);
 		RoleRepresentation editorRole = mockRoleRepresentation(rolesResource, "EDITOR");
-		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+		Set<String> roles = Set.of("EDITOR");
 
 		User invited = this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles);
 
@@ -379,7 +375,7 @@ class KeycloakUserDirectoryAdapterTest {
 		var rolesResource = mock(RolesResource.class);
 		when(this.realmResource.roles()).thenReturn(rolesResource);
 		when(rolesResource.get("EDITOR")).thenThrow(new RuntimeException("Keycloak unreachable"));
-		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+		Set<String> roles = Set.of("EDITOR");
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
 			.isInstanceOf(KeycloakCommunicationException.class)
@@ -408,7 +404,7 @@ class KeycloakUserDirectoryAdapterTest {
 		doThrow(new RuntimeException("550 You can only send testing emails to your own email address"))
 			.when(userResource)
 			.executeActionsEmail(any(), any(), any(), any());
-		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+		Set<String> roles = Set.of("EDITOR");
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
 			.isInstanceOf(EmailDeliveryFailedException.class)
@@ -421,7 +417,7 @@ class KeycloakUserDirectoryAdapterTest {
 	void refusesToInviteAnAlreadyRegisteredEmail() {
 		var response = Response.status(Response.Status.CONFLICT).build();
 		when(this.usersResource.create(this.newUserCaptor.capture())).thenReturn(response);
-		Set<RealmRole> roles = Set.of(RealmRole.ADMIN);
+		Set<String> roles = Set.of("ADMIN");
 
 		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.inviteUser(INVITED_EMAIL, roles))
 			.isInstanceOf(EmailAlreadyRegisteredException.class);
@@ -512,7 +508,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(this.realmResource.roles()).thenReturn(rolesResource);
 		RoleRepresentation adminRole = mockRoleRepresentation(rolesResource, "ADMIN");
 
-		User updated = this.keycloakUserDirectoryAdapter.assignRole(UUID.fromString(NAMI_ID), RealmRole.ADMIN);
+		User updated = this.keycloakUserDirectoryAdapter.assignRole(UUID.fromString(NAMI_ID), "ADMIN");
 
 		verify(this.namiRoleScope).add(List.of(adminRole));
 		assertThat(updated.roles()).containsExactlyInAnyOrder("EDITOR", "ADMIN");
@@ -522,7 +518,7 @@ class KeycloakUserDirectoryAdapterTest {
 	void assigningAnAlreadyHeldRoleIsANoOp() {
 		mockActiveUser(NAMI_ID, "EDITOR");
 
-		User updated = this.keycloakUserDirectoryAdapter.assignRole(UUID.fromString(NAMI_ID), RealmRole.EDITOR);
+		User updated = this.keycloakUserDirectoryAdapter.assignRole(UUID.fromString(NAMI_ID), "EDITOR");
 
 		assertThat(updated.roles()).containsExactly("EDITOR");
 		verify(this.realmResource, never()).roles();
@@ -533,7 +529,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(this.usersResource.get(NAMI_ID)).thenThrow(new NotFoundException());
 
 		UUID namiId = UUID.fromString(NAMI_ID);
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.assignRole(namiId, RealmRole.ADMIN))
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.assignRole(namiId, "ADMIN"))
 			.isInstanceOf(UserNotFoundException.class);
 	}
 
@@ -545,7 +541,7 @@ class KeycloakUserDirectoryAdapterTest {
 		RoleRepresentation reviewerRole = mockRoleRepresentation(rolesResource, "REVIEWER");
 
 		UUID namiId = UUID.fromString(NAMI_ID);
-		User updated = this.keycloakUserDirectoryAdapter.revokeRole(namiId, RealmRole.REVIEWER);
+		User updated = this.keycloakUserDirectoryAdapter.revokeRole(namiId, "REVIEWER");
 
 		verify(this.namiRoleScope).remove(List.of(reviewerRole));
 		assertThat(updated.roles()).containsExactly("EDITOR");
@@ -556,7 +552,7 @@ class KeycloakUserDirectoryAdapterTest {
 		mockActiveUser(NAMI_ID, "EDITOR");
 
 		UUID namiId = UUID.fromString(NAMI_ID);
-		User updated = this.keycloakUserDirectoryAdapter.revokeRole(namiId, RealmRole.REVIEWER);
+		User updated = this.keycloakUserDirectoryAdapter.revokeRole(namiId, "REVIEWER");
 
 		assertThat(updated.roles()).containsExactly("EDITOR");
 		verify(this.realmResource, never()).roles();
@@ -567,7 +563,7 @@ class KeycloakUserDirectoryAdapterTest {
 		mockActiveUser(NAMI_ID, "EDITOR");
 
 		UUID namiId = UUID.fromString(NAMI_ID);
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(namiId, RealmRole.EDITOR))
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(namiId, "EDITOR"))
 			.isInstanceOf(LastRoleException.class);
 	}
 
@@ -581,7 +577,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(roleResource.getUserMembers(0, 2)).thenReturn(List.of(userWithId(LUFFY_ID)));
 
 		UUID luffyId = UUID.fromString(LUFFY_ID);
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(luffyId, RealmRole.ADMIN))
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(luffyId, "ADMIN"))
 			.isInstanceOf(LastAdministratorException.class);
 	}
 
@@ -601,7 +597,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(roleResource.getUserMembers(0, 2)).thenReturn(List.of(userWithId(LUFFY_ID)));
 
 		UUID luffyId = UUID.fromString(LUFFY_ID);
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(luffyId, RealmRole.ADMIN))
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(luffyId, "ADMIN"))
 			.isInstanceOf(LastAdministratorException.class);
 	}
 
@@ -616,7 +612,7 @@ class KeycloakUserDirectoryAdapterTest {
 		RoleRepresentation adminRole = new RoleRepresentation("ADMIN", null, false);
 		when(roleResource.toRepresentation()).thenReturn(adminRole);
 
-		User updated = this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(LUFFY_ID), RealmRole.ADMIN);
+		User updated = this.keycloakUserDirectoryAdapter.revokeRole(UUID.fromString(LUFFY_ID), "ADMIN");
 
 		verify(this.luffyRoleScope).remove(List.of(adminRole));
 		assertThat(updated.roles()).containsExactly("EDITOR");
@@ -627,7 +623,7 @@ class KeycloakUserDirectoryAdapterTest {
 		when(this.usersResource.get(NAMI_ID)).thenThrow(new NotFoundException());
 
 		UUID namiId = UUID.fromString(NAMI_ID);
-		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(namiId, RealmRole.EDITOR))
+		assertThatThrownBy(() -> this.keycloakUserDirectoryAdapter.revokeRole(namiId, "EDITOR"))
 			.isInstanceOf(UserNotFoundException.class);
 	}
 
@@ -738,36 +734,6 @@ class KeycloakUserDirectoryAdapterTest {
 			.isInstanceOf(UserNotFoundException.class);
 	}
 
-	@Test
-	void listsEachRealmRolesClientRoleCompositesAsItsPermissions() {
-		var rolesResource = mock(RolesResource.class);
-		when(this.realmResource.roles()).thenReturn(rolesResource);
-		mockClientRoleComposites(rolesResource, "ADMIN", "users:read", "audit:read");
-		mockClientRoleComposites(rolesResource, "REVIEWER", "docs:read", "docs:review");
-		mockClientRoleComposites(rolesResource, "EDITOR", "docs:read", "docs:write");
-
-		Map<RealmRole, List<String>> permissions = this.keycloakUserDirectoryAdapter.listRolePermissions();
-
-		assertThat(permissions).containsEntry(RealmRole.ADMIN, List.of("audit:read", "users:read"))
-			.containsEntry(RealmRole.REVIEWER, List.of("docs:read", "docs:review"))
-			.containsEntry(RealmRole.EDITOR, List.of("docs:read", "docs:write"));
-	}
-
-	@Test
-	void ignoresARealmRoleCompositeWhenListingPermissions() {
-		var rolesResource = mock(RolesResource.class);
-		when(this.realmResource.roles()).thenReturn(rolesResource);
-		var roleResource = mock(RoleResource.class);
-		when(rolesResource.get(anyString())).thenReturn(roleResource);
-		var realmComposite = new RoleRepresentation("default-roles-onepiece", null, true);
-		realmComposite.setClientRole(false);
-		when(roleResource.getRoleComposites()).thenReturn(Set.of(realmComposite));
-
-		Map<RealmRole, List<String>> permissions = this.keycloakUserDirectoryAdapter.listRolePermissions();
-
-		assertThat(permissions.get(RealmRole.ADMIN)).isEmpty();
-	}
-
 	/**
 	 * Stubs a full {@code UsersResource.get(keycloakId)} chain for an ACTIVE user holding
 	 * exactly {@code roleNames} - {@code listAll()} for the role fetch every
@@ -855,17 +821,6 @@ class KeycloakUserDirectoryAdapterTest {
 		when(rolesResource.get(roleName)).thenReturn(roleResource);
 		when(roleResource.toRepresentation()).thenReturn(representation);
 		return representation;
-	}
-
-	private void mockClientRoleComposites(RolesResource rolesResource, String roleName, String... permissionNames) {
-		var roleResource = mock(RoleResource.class);
-		when(rolesResource.get(roleName)).thenReturn(roleResource);
-		Set<RoleRepresentation> composites = Arrays.stream(permissionNames).map(name -> {
-			var representation = new RoleRepresentation(name, null, false);
-			representation.setClientRole(true);
-			return representation;
-		}).collect(Collectors.toSet());
-		when(roleResource.getRoleComposites()).thenReturn(composites);
 	}
 
 	private void mockRoles(String keycloakId, String... roleNames) {

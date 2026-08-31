@@ -50,7 +50,7 @@ class AuditControllerTest {
 	@Test
 	void aCallerWithTheAuditReadPermissionCanListEvents() throws Exception {
 		var event = new AuditEvent(AuditAction.USER_INVITED, UUID.randomUUID(), "luffy@onepiece.local",
-				UUID.randomUUID(), "usopp@onepiece.local", Instant.EPOCH);
+				UUID.randomUUID(), "usopp@onepiece.local", null, Instant.EPOCH);
 		when(this.auditQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(event)));
 
 		var request = get("/audit").with(asUserWithAuthorities("PERMISSION_audit:read"));

@@ -56,7 +56,7 @@ class JpaAuditLogAdapterTest {
 		var targetUserId = UUID.randomUUID();
 		var occurredAt = Instant.parse("2026-08-23T10:00:00Z");
 		var event = new AuditEvent(AuditAction.USER_INVITED, actorUserId, "luffy@onepiece.local", targetUserId,
-				"usopp@onepiece.local", occurredAt);
+				"usopp@onepiece.local", null, occurredAt);
 
 		this.jpaAuditLogAdapter.record(event);
 
@@ -66,7 +66,25 @@ class JpaAuditLogAdapterTest {
 			assertThat(entity.getActorEmail()).isEqualTo("luffy@onepiece.local");
 			assertThat(entity.getTargetUserId()).isEqualTo(targetUserId);
 			assertThat(entity.getTargetEmail()).isEqualTo("usopp@onepiece.local");
+			assertThat(entity.getTargetLabel()).isNull();
 			assertThat(entity.getOccurredAt()).isEqualTo(occurredAt);
+		});
+	}
+
+	@Test
+	void persistsACatalogActionWithNoTargetUser() {
+		var actorUserId = UUID.randomUUID();
+		var occurredAt = Instant.parse("2026-08-23T10:00:00Z");
+		var event = new AuditEvent(AuditAction.ROLE_CREATED, actorUserId, "luffy@onepiece.local", null, null,
+				"NAVIGATOR", occurredAt);
+
+		this.jpaAuditLogAdapter.record(event);
+
+		assertThat(this.auditLogRepository.findAll()).singleElement().satisfies(entity -> {
+			assertThat(entity.getAction()).isEqualTo("ROLE_CREATED");
+			assertThat(entity.getTargetUserId()).isNull();
+			assertThat(entity.getTargetEmail()).isNull();
+			assertThat(entity.getTargetLabel()).isEqualTo("NAVIGATOR");
 		});
 	}
 
@@ -100,7 +118,7 @@ class JpaAuditLogAdapterTest {
 
 	private static AuditEvent eventAt(UUID actorId, UUID targetId, Instant occurredAt) {
 		return new AuditEvent(AuditAction.USER_INVITED, actorId, "luffy@onepiece.local", targetId,
-				"usopp@onepiece.local", occurredAt);
+				"usopp@onepiece.local", null, occurredAt);
 	}
 
 }

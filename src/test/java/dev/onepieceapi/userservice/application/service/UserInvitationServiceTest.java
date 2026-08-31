@@ -1,11 +1,12 @@
 package dev.onepieceapi.userservice.application.service;
 
+import dev.onepieceapi.userservice.application.exception.RoleNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.AuditLogPort;
+import dev.onepieceapi.userservice.application.port.out.RoleDirectoryPort;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,8 +47,13 @@ class UserInvitationServiceTest {
 
 	private static final List<String> INVITED_ROLES = List.of("EDITOR");
 
+	private static final Map<String, List<String>> ROLE_CATALOG = Map.of("ADMIN", List.of(), "EDITOR", List.of());
+
 	@Mock
 	private UserDirectoryPort userDirectoryPort;
+
+	@Mock
+	private RoleDirectoryPort roleDirectoryPort;
 
 	@Mock
 	private AuditLogPort auditLogPort;
@@ -59,13 +66,15 @@ class UserInvitationServiceTest {
 	@BeforeEach
 	void setUp() {
 		var clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		var service = new UserInvitationService(this.userDirectoryPort, this.auditLogPort, clock);
+		var directory = this.userDirectoryPort;
+		var service = new UserInvitationService(directory, this.roleDirectoryPort, this.auditLogPort, clock);
 		this.userInvitationService = service;
 	}
 
 	@Test
 	void invitesTheUserThroughTheIdentityDirectoryAndRecordsWhoDidIt() {
-		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+		when(this.roleDirectoryPort.listRoles()).thenReturn(ROLE_CATALOG);
+		Set<String> roles = Set.of("EDITOR");
 		var invited = pendingInvitedUser();
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 
@@ -83,8 +92,21 @@ class UserInvitationServiceTest {
 	}
 
 	@Test
+	void rejectsInvitingWithARoleThatDoesNotExist() {
+		when(this.roleDirectoryPort.listRoles()).thenReturn(ROLE_CATALOG);
+		Set<String> roles = Set.of("NAVIGATOR");
+
+		assertThatThrownBy(() -> this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN))
+			.isInstanceOf(RoleNotFoundException.class);
+
+		verifyNoInteractions(this.userDirectoryPort);
+		verifyNoInteractions(this.auditLogPort);
+	}
+
+	@Test
 	void doesNotRecordAnAuditEventWhenProvisioningFails() {
-		Set<RealmRole> roles = Set.of(RealmRole.ADMIN);
+		when(this.roleDirectoryPort.listRoles()).thenReturn(ROLE_CATALOG);
+		Set<String> roles = Set.of("ADMIN");
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles))
 			.thenThrow(new RuntimeException("Keycloak unreachable"));
 
@@ -96,7 +118,8 @@ class UserInvitationServiceTest {
 
 	@Test
 	void propagatesTheFailureWhenTheAuditWriteFails() {
-		Set<RealmRole> roles = Set.of(RealmRole.EDITOR);
+		when(this.roleDirectoryPort.listRoles()).thenReturn(ROLE_CATALOG);
+		Set<String> roles = Set.of("EDITOR");
 		var invited = pendingInvitedUser();
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 		var auditFailure = new RuntimeException("Postgres unreachable");

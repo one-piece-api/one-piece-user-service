@@ -2,7 +2,6 @@ package dev.onepieceapi.userservice.application.service;
 
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +14,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,7 +67,7 @@ class UserQueryServiceTest {
 	@Test
 	void passesTheFilterThroughToTheIdentityDirectory() {
 		Pageable pageable = PageRequest.of(0, 20);
-		var filter = new UserFilter("nami", RealmRole.EDITOR, AccountStatus.ACTIVE);
+		var filter = new UserFilter("nami", "EDITOR", AccountStatus.ACTIVE);
 		List<String> roles = List.of("EDITOR");
 		var nami = new User(LUFFY_ID, "nami", "nami@onepiece.local", AccountStatus.ACTIVE, roles, null);
 		when(this.userDirectoryPort.findUsers(0, 20, filter)).thenReturn(List.of(nami));
@@ -90,17 +88,6 @@ class UserQueryServiceTest {
 		User result = this.userQueryService.getUser(LUFFY_ID);
 
 		assertThat(result).isEqualTo(luffy);
-	}
-
-	@Test
-	void listsRolePermissionsThroughTheIdentityDirectory() {
-		var expected = Map.of(RealmRole.ADMIN, List.of("audit:read", "users:read"), RealmRole.EDITOR,
-				List.of("docs:read", "docs:write"));
-		when(this.userDirectoryPort.listRolePermissions()).thenReturn(expected);
-
-		Map<RealmRole, List<String>> result = this.userQueryService.listRolePermissions();
-
-		assertThat(result).isEqualTo(expected);
 	}
 
 }

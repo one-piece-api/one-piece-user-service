@@ -10,7 +10,6 @@ import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
 import jakarta.ws.rs.NotFoundException;
@@ -32,28 +31,28 @@ import org.springframework.stereotype.Component;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Keycloak-backed implementation of {@link UserDirectoryPort} - the only place in this
- * codebase that talks to the Keycloak Admin API. Swapping identity providers means
- * writing a new adapter against this same port, not touching {@code UserQueryService} or
- * the domain.
+ * Keycloak-backed implementation of {@link UserDirectoryPort} - user identities only; the
+ * role/permission catalog itself is {@link KeycloakRoleDirectoryAdapter}'s concern
+ * ({@code RoleDirectoryPort}). Swapping identity providers means writing a new adapter
+ * against this same port, not touching {@code UserQueryService} or the domain.
  */
 @Component
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
 @Slf4j
 public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
+
+	/** UF-IDU-16's "last administrator" protection is tied to this specific role name. */
+	private static final String ADMIN_ROLE = "ADMIN";
 
 	/**
 	 * Set on invite (UF-IDU-01) and re-sent as-is on resend (UF-IDU-03), so the invited
@@ -138,7 +137,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		List<UserRepresentation> candidates;
 		if (filter.role() != null) {
 			RolesResource realmRoles = getRealm().roles();
-			candidates = realmRoles.get(filter.role().name()).getUserMembers(0, FILTER_CANDIDATE_CAP);
+			candidates = realmRoles.get(filter.role()).getUserMembers(0, FILTER_CANDIDATE_CAP);
 		}
 		else if (filter.query() != null && !filter.query().isBlank()) {
 			candidates = users.search(filter.query(), 0, FILTER_CANDIDATE_CAP);
@@ -154,7 +153,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		boolean matchesQuery = query == null || query.isEmpty()
 				|| user.username().toLowerCase(Locale.ROOT).contains(query)
 				|| user.email().toLowerCase(Locale.ROOT).contains(query);
-		boolean matchesRole = filter.role() == null || user.roles().contains(filter.role().name());
+		boolean matchesRole = filter.role() == null || user.roles().contains(filter.role());
 		boolean matchesStatus = filter.status() == null || user.status() == filter.status();
 		return matchesQuery && matchesRole && matchesStatus;
 	}
@@ -226,7 +225,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	}
 
 	@Override
-	public User inviteUser(String email, Set<RealmRole> roles) {
+	public User inviteUser(String email, Set<String> roles) {
 		UsersResource users = getRealm().users();
 		String keycloakId = createUnactivatedUser(users, email);
 
@@ -258,7 +257,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		// The account's username is still the email placeholder set in
 		// createUnactivatedUser -
 		// the real, user-chosen one doesn't exist until activation (UF-IDU-02).
-		return new User(userId, email, email, AccountStatus.PENDING, roleNames(roles), Instant.now(this.clock));
+		Instant now = Instant.now(this.clock);
+		return new User(userId, email, email, AccountStatus.PENDING, List.copyOf(roles), now);
 	}
 
 	private String createUnactivatedUser(UsersResource users, String email) {
@@ -288,10 +288,6 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		}
 	}
 
-	private static List<String> roleNames(Set<RealmRole> roles) {
-		return roles.stream().map(RealmRole::name).toList();
-	}
-
 	@Override
 	public User resendInvitation(UUID userId) {
 		UsersResource users = getRealm().users();
@@ -316,10 +312,10 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	}
 
 	@Override
-	public User assignRole(UUID userId, RealmRole role) {
+	public User assignRole(UUID userId, String role) {
 		UsersResource users = getRealm().users();
 		User user = loadUser(users, userId);
-		if (user.roles().contains(role.name())) {
+		if (user.roles().contains(role)) {
 			return user;
 		}
 
@@ -330,15 +326,15 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			throw new KeycloakCommunicationException("Failed to assign role " + role + " to " + userId, ex);
 		}
 
-		List<String> updatedRoles = Stream.concat(user.roles().stream(), Stream.of(role.name())).toList();
+		List<String> updatedRoles = Stream.concat(user.roles().stream(), Stream.of(role)).toList();
 		return withRoles(user, updatedRoles);
 	}
 
 	@Override
-	public User revokeRole(UUID userId, RealmRole role) {
+	public User revokeRole(UUID userId, String role) {
 		UsersResource users = getRealm().users();
 		User user = loadUser(users, userId);
-		if (!user.roles().contains(role.name())) {
+		if (!user.roles().contains(role)) {
 			return user;
 		}
 		// Checked in this order deliberately: when ADMIN is this account's only role (the
@@ -347,7 +343,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		// ADMIN-specific one first (UF-IDU-16) is more actionable than the generic
 		// "at least one role must remain" (UF-IDU-15), since re-adding some other role
 		// first wouldn't actually fix the real problem here.
-		if (role == RealmRole.ADMIN && !hasAnotherAdmin(userId)) {
+		if (ADMIN_ROLE.equals(role) && !hasAnotherAdmin(userId)) {
 			throw new LastAdministratorException(userId);
 		}
 		if (user.roles().size() == 1) {
@@ -355,7 +351,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		}
 
 		try {
-			RoleRepresentation representation = getRealm().roles().get(role.name()).toRepresentation();
+			RoleRepresentation representation = getRealm().roles().get(role).toRepresentation();
 			users.get(userId.toString()).roles().realmLevel().remove(List.of(representation));
 		}
 		catch (RuntimeException ex) {
@@ -363,7 +359,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			throw new KeycloakCommunicationException(message, ex);
 		}
 
-		List<String> remainingRoles = user.roles().stream().filter(name -> !name.equals(role.name())).toList();
+		List<String> remainingRoles = user.roles().stream().filter(name -> !name.equals(role)).toList();
 		return withRoles(user, remainingRoles);
 	}
 
@@ -378,7 +374,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		if (user.status() == AccountStatus.DISABLED) {
 			return user;
 		}
-		if (user.roles().contains(RealmRole.ADMIN.name()) && !hasAnotherAdmin(userId)) {
+		if (user.roles().contains(ADMIN_ROLE) && !hasAnotherAdmin(userId)) {
 			throw new LastAdministratorException(userId);
 		}
 
@@ -420,28 +416,6 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		return loadUser(users, userId);
 	}
 
-	@Override
-	public Map<RealmRole, List<String>> listRolePermissions() {
-		try {
-			RolesResource realmRoles = getRealm().roles();
-			return Arrays.stream(RealmRole.values())
-				.collect(Collectors.toMap(role -> role, role -> permissionsOf(realmRoles, role)));
-		}
-		catch (RuntimeException ex) {
-			throw new KeycloakCommunicationException("Failed to list role permissions from Keycloak", ex);
-		}
-	}
-
-	private List<String> permissionsOf(RolesResource realmRoles, RealmRole role) {
-		return realmRoles.get(role.name())
-			.getRoleComposites()
-			.stream()
-			.filter(RoleRepresentation::getClientRole)
-			.map(RoleRepresentation::getName)
-			.sorted()
-			.toList();
-	}
-
 	private void setEnabled(UserResource userResource, boolean enabled) {
 		UserRepresentation representation = userResource.toRepresentation();
 		representation.setEnabled(enabled);
@@ -455,7 +429,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	 * nothing more.
 	 */
 	private boolean hasAnotherAdmin(UUID excludedUserId) {
-		List<UserRepresentation> admins = getRealm().roles().get(RealmRole.ADMIN.name()).getUserMembers(0, 2);
+		List<UserRepresentation> admins = getRealm().roles().get(ADMIN_ROLE).getUserMembers(0, 2);
 		return admins.stream().anyMatch(admin -> !admin.getId().equals(excludedUserId.toString()));
 	}
 
@@ -492,10 +466,10 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 		log.warn("Rolled back Keycloak user {} after invitation failure", keycloakId, cause);
 	}
 
-	private void assignRealmRoles(UsersResource users, String keycloakId, Set<RealmRole> roles) {
+	private void assignRealmRoles(UsersResource users, String keycloakId, Set<String> roles) {
 		RolesResource realmRoles = getRealm().roles();
 		List<RoleRepresentation> representations = roles.stream()
-			.map(role -> realmRoles.get(role.name()).toRepresentation())
+			.map(role -> realmRoles.get(role).toRepresentation())
 			.toList();
 		users.get(keycloakId).roles().realmLevel().add(representations);
 	}

@@ -2,7 +2,6 @@ package dev.onepieceapi.userservice.adapter.in.web;
 
 import dev.onepieceapi.userservice.adapter.in.web.dto.InviteUserRequest;
 import dev.onepieceapi.userservice.adapter.in.web.dto.PageResponse;
-import dev.onepieceapi.userservice.adapter.in.web.dto.RolePermissionsResponse;
 import dev.onepieceapi.userservice.adapter.in.web.dto.UserSummaryResponse;
 import dev.onepieceapi.userservice.adapter.in.web.mapper.UserSummaryResponseMapper;
 import dev.onepieceapi.userservice.application.service.UserAccessService;
@@ -10,7 +9,6 @@ import dev.onepieceapi.userservice.application.service.UserInvitationService;
 import dev.onepieceapi.userservice.application.service.UserQueryService;
 import dev.onepieceapi.userservice.application.service.UserRoleService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
 import jakarta.validation.Valid;
@@ -30,8 +28,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,7 +36,8 @@ import java.util.UUID;
  * UF-IDU-01, the resend endpoint from UF-IDU-03, the role assign/revoke endpoints from
  * UF-IDU-15/16, and the revoke-access/reactivate endpoints from UF-IDU-13/14. Access is
  * enforced per-endpoint by permission authority, not here - see
- * {@code security.SecuredEndpoint}.
+ * {@code security.SecuredEndpoint}. The role/permission catalog itself is
+ * {@link RoleController}'s concern, not this one's.
  */
 @RestController
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
@@ -61,7 +58,7 @@ class UserController {
 	 */
 	@GetMapping(ApiPaths.USERS)
 	PageResponse<UserSummaryResponse> listUsers(Pageable pageable, @RequestParam Optional<String> q,
-			@RequestParam Optional<RealmRole> role, @RequestParam Optional<AccountStatus> status) {
+			@RequestParam Optional<String> role, @RequestParam Optional<AccountStatus> status) {
 		var filter = new UserFilter(q.orElse(null), role.orElse(null), status.orElse(null));
 		Page<UserSummaryResponse> page = this.userQueryService.list(pageable, filter)
 			.map(UserSummaryResponseMapper::toResponse);
@@ -71,22 +68,6 @@ class UserController {
 	@GetMapping(ApiPaths.USER_BY_ID)
 	UserSummaryResponse getUser(@PathVariable UUID userId) {
 		return UserSummaryResponseMapper.toResponse(this.userQueryService.getUser(userId));
-	}
-
-	/**
-	 * The read-only role/permission registry (see
-	 * {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}) - powers the UI's
-	 * "Roles &amp; Permissions" panel and lets the frontend compute any user's effective
-	 * permissions client-side from their roles, without a per-user server call.
-	 */
-	@GetMapping(ApiPaths.ROLES)
-	List<RolePermissionsResponse> listRoles() {
-		Map<RealmRole, List<String>> rolePermissions = this.userQueryService.listRolePermissions();
-		return rolePermissions.entrySet()
-			.stream()
-			.map(entry -> new RolePermissionsResponse(entry.getKey().name(), entry.getValue()))
-			.sorted((a, b) -> a.role().compareTo(b.role()))
-			.toList();
 	}
 
 	@PostMapping(ApiPaths.USERS)
@@ -103,14 +84,14 @@ class UserController {
 	}
 
 	@PutMapping(ApiPaths.USER_ROLE)
-	UserSummaryResponse assignRole(@PathVariable UUID userId, @PathVariable RealmRole role,
+	UserSummaryResponse assignRole(@PathVariable UUID userId, @PathVariable String role,
 			@AuthenticationPrincipal User user) {
 		var target = this.userRoleService.assignRole(userId, role, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
 	@DeleteMapping(ApiPaths.USER_ROLE)
-	UserSummaryResponse revokeRole(@PathVariable UUID userId, @PathVariable RealmRole role,
+	UserSummaryResponse revokeRole(@PathVariable UUID userId, @PathVariable String role,
 			@AuthenticationPrincipal User user) {
 		var target = this.userRoleService.revokeRole(userId, role, user);
 		return UserSummaryResponseMapper.toResponse(target);

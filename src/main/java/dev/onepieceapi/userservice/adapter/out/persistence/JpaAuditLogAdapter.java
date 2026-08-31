@@ -28,7 +28,7 @@ public class JpaAuditLogAdapter implements AuditLogPort {
 	@Override
 	public void record(AuditEvent event) {
 		var entity = new AuditLogEntity(event.action().name(), event.actorUserId(), event.actorEmail(),
-				event.targetUserId(), event.targetEmail(), event.occurredAt());
+				event.targetUserId(), event.targetEmail(), event.targetLabel(), event.occurredAt());
 		this.auditLogRepository.save(entity);
 	}
 
@@ -58,7 +58,7 @@ public class JpaAuditLogAdapter implements AuditLogPort {
 	private static AuditEvent toDomain(AuditLogEntity entity) {
 		var action = AuditAction.valueOf(entity.getAction());
 		return new AuditEvent(action, entity.getActorUserId(), entity.getActorEmail(), entity.getTargetUserId(),
-				entity.getTargetEmail(), entity.getOccurredAt());
+				entity.getTargetEmail(), entity.getTargetLabel(), entity.getOccurredAt());
 	}
 
 }

@@ -3,12 +3,10 @@ package dev.onepieceapi.userservice.application.port.out;
 import dev.onepieceapi.userservice.application.exception.EmailAlreadyRegisteredException;
 import dev.onepieceapi.userservice.application.exception.InvitationNotResendableException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -18,7 +16,9 @@ import java.util.UUID;
  * provider backs them. The application layer depends only on this interface, never on a
  * specific provider's SDK: Keycloak is one implementation of it, not the only one it is
  * written against. Extend it only when a new use case actually needs another
- * identity-provider capability.
+ * identity-provider capability. The role/permission catalog itself (creating a role,
+ * creating a permission, which permissions a role holds) is a different resource, not a
+ * user identity - see {@link RoleDirectoryPort}.
  */
 public interface UserDirectoryPort {
 
@@ -49,7 +49,7 @@ public interface UserDirectoryPort {
 	 * @throws EmailAlreadyRegisteredException if the identity provider already has an
 	 * account for {@code email}
 	 */
-	User inviteUser(String email, Set<RealmRole> roles);
+	User inviteUser(String email, Set<String> roles);
 
 	/**
 	 * Re-triggers the identity provider's own invitation email for an account whose
@@ -70,7 +70,7 @@ public interface UserDirectoryPort {
 	 * already has is left as-is, not an error.
 	 * @throws UserNotFoundException if no account exists for {@code userId}
 	 */
-	User assignRole(UUID userId, RealmRole role);
+	User assignRole(UUID userId, String role);
 
 	/**
 	 * Revokes {@code role} from {@code userId} (UF-IDU-15). Idempotent: a role the
@@ -81,7 +81,7 @@ public interface UserDirectoryPort {
 	 * @throws dev.onepieceapi.userservice.application.exception.LastAdministratorException
 	 * if {@code role} is ADMIN and this account is the realm's last one
 	 */
-	User revokeRole(UUID userId, RealmRole role);
+	User revokeRole(UUID userId, String role);
 
 	/**
 	 * Disables the identity-provider account and invalidates every active session/refresh
@@ -101,14 +101,5 @@ public interface UserDirectoryPort {
 	 * @throws UserNotFoundException if no account exists for {@code userId}
 	 */
 	User reactivate(UUID userId);
-
-	/**
-	 * The fixed realm roles and the permissions each currently bundles - its Keycloak
-	 * composite client-roles (see
-	 * {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}). Powers the UI's
-	 * read-only role/permission registry; editing a role's permission set happens in
-	 * Keycloak directly for now, not through this port.
-	 */
-	Map<RealmRole, List<String>> listRolePermissions();
 
 }

@@ -1,8 +1,9 @@
 package dev.onepieceapi.userservice.application.service;
 
+import dev.onepieceapi.userservice.application.exception.RoleNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.AuditLogPort;
+import dev.onepieceapi.userservice.application.port.out.RoleDirectoryPort;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,11 +33,14 @@ public class UserInvitationService {
 
 	private final UserDirectoryPort userDirectoryPort;
 
+	private final RoleDirectoryPort roleDirectoryPort;
+
 	private final AuditLogPort auditLogPort;
 
 	private final Clock clock;
 
-	public User invite(String email, Set<RealmRole> roles, User actor) {
+	public User invite(String email, Set<String> roles, User actor) {
+		requireRolesExist(roles);
 		User invited = this.userDirectoryPort.inviteUser(email, roles);
 		this.auditLogPort.record(AuditEventMapper.userInvited(actor, invited, Instant.now(this.clock)));
 		return invited;
@@ -46,6 +50,20 @@ public class UserInvitationService {
 		User target = this.userDirectoryPort.resendInvitation(userId);
 		this.auditLogPort.record(AuditEventMapper.invitationResent(actor, target, Instant.now(this.clock)));
 		return target;
+	}
+
+	/**
+	 * Roles are dynamic (see
+	 * {@code docs/adr/0012-role-permission-catalog-management.md}), so an unrecognized
+	 * role name no longer fails fast at deserialization the way the old fixed enum did -
+	 * checked explicitly here instead, against the live catalog, before Keycloak
+	 * provisioning even starts.
+	 */
+	private void requireRolesExist(Set<String> roles) {
+		var existing = this.roleDirectoryPort.listRoles().keySet();
+		roles.stream().filter(role -> !existing.contains(role)).findFirst().ifPresent(role -> {
+			throw new RoleNotFoundException(role);
+		});
 	}
 
 }

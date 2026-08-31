@@ -13,7 +13,6 @@ import dev.onepieceapi.userservice.application.service.UserInvitationService;
 import dev.onepieceapi.userservice.application.service.UserQueryService;
 import dev.onepieceapi.userservice.application.service.UserRoleService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
-import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -108,7 +106,7 @@ class UserControllerTest {
 			.with(asUserWithAuthorities(luffy, "PERMISSION_users:read"));
 		this.mockMvc.perform(request).andExpect(status().isOk());
 
-		var expectedFilter = new UserFilter("luf", RealmRole.ADMIN, AccountStatus.ACTIVE);
+		var expectedFilter = new UserFilter("luf", "ADMIN", AccountStatus.ACTIVE);
 		assertThat(filterCaptor.getValue()).isEqualTo(expectedFilter);
 	}
 
@@ -127,8 +125,9 @@ class UserControllerTest {
 		UUID invitedId = UUID.randomUUID();
 		var invited = new User(invitedId, "usopp@onepiece.local", "usopp@onepiece.local", AccountStatus.PENDING,
 				invitedRoles, Instant.EPOCH);
-		when(this.userInvitationService.invite("usopp@onepiece.local", Set.of(RealmRole.EDITOR), luffy))
-			.thenReturn(invited);
+		Set<String> requestedRoles = Set.of("EDITOR");
+		var invitation = this.userInvitationService;
+		when(invitation.invite("usopp@onepiece.local", requestedRoles, luffy)).thenReturn(invited);
 
 		var request = post("/users").with(asUserWithAuthorities(luffy, "PERMISSION_users:invite"))
 			.contentType(MediaType.APPLICATION_JSON)
@@ -153,7 +152,7 @@ class UserControllerTest {
 	@Test
 	void invitingAnAlreadyRegisteredEmailReturnsConflict() throws Exception {
 		var luffy = luffy();
-		when(this.userInvitationService.invite("usopp@onepiece.local", Set.of(RealmRole.EDITOR), luffy))
+		when(this.userInvitationService.invite("usopp@onepiece.local", Set.of("EDITOR"), luffy))
 			.thenThrow(new EmailAlreadyRegisteredException("usopp@onepiece.local"));
 
 		var request = post("/users").with(asUserWithAuthorities(luffy, "PERMISSION_users:invite"))
@@ -261,7 +260,7 @@ class UserControllerTest {
 		var targetId = UUID.randomUUID();
 		var updated = new User(targetId, "usopp", "usopp@onepiece.local", AccountStatus.ACTIVE,
 				List.of("EDITOR", "ADMIN"), Instant.EPOCH);
-		when(this.userRoleService.assignRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
+		when(this.userRoleService.assignRole(targetId, "ADMIN", luffy)).thenReturn(updated);
 
 		var request = put("/users/" + targetId + "/roles/ADMIN")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:assign"));
@@ -285,7 +284,7 @@ class UserControllerTest {
 		List<String> roles = List.of("EDITOR");
 		String email = "usopp@onepiece.local";
 		var updated = new User(targetId, "usopp", email, AccountStatus.ACTIVE, roles, Instant.EPOCH);
-		when(this.userRoleService.revokeRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
+		when(this.userRoleService.revokeRole(targetId, "ADMIN", luffy)).thenReturn(updated);
 
 		var request = delete("/users/" + targetId + "/roles/ADMIN")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:assign"));
@@ -295,7 +294,7 @@ class UserControllerTest {
 	@Test
 	void revokingTheLastAdministratorRoleReturnsConflict() throws Exception {
 		var luffy = luffy();
-		when(this.userRoleService.revokeRole(luffy.userId(), RealmRole.ADMIN, luffy))
+		when(this.userRoleService.revokeRole(luffy.userId(), "ADMIN", luffy))
 			.thenThrow(new LastAdministratorException(luffy.userId()));
 
 		var request = delete("/users/" + luffy.userId() + "/roles/ADMIN")
@@ -309,8 +308,8 @@ class UserControllerTest {
 	void revokingAUsersLastRoleReturnsConflict() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
-		when(this.userRoleService.revokeRole(targetId, RealmRole.EDITOR, luffy))
-			.thenThrow(new LastRoleException(targetId, RealmRole.EDITOR));
+		when(this.userRoleService.revokeRole(targetId, "EDITOR", luffy))
+			.thenThrow(new LastRoleException(targetId, "EDITOR"));
 
 		var request = delete("/users/" + targetId + "/roles/EDITOR")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:assign"));
@@ -411,28 +410,6 @@ class UserControllerTest {
 
 		var request = post("/users/" + targetId + "/reactivate")
 			.with(asUserWithAuthorities(nami, NO_RELEVANT_PERMISSION));
-		this.mockMvc.perform(request).andExpect(status().isForbidden());
-	}
-
-	@Test
-	void aCallerWithRolesReadCanListTheRolePermissionRegistry() throws Exception {
-		var luffy = luffy();
-		var rolePermissions = Map.of(RealmRole.ADMIN, List.of("audit:read", "users:read"), RealmRole.EDITOR,
-				List.of("docs:read", "docs:write"));
-		when(this.userQueryService.listRolePermissions()).thenReturn(rolePermissions);
-
-		var request = get("/roles").with(asUserWithAuthorities(luffy, "PERMISSION_roles:read"));
-		var response = this.mockMvc.perform(request).andExpect(status().isOk()).andReturn().getResponse();
-
-		assertThat(response.getContentAsString()).contains("\"role\":\"ADMIN\"", "\"role\":\"EDITOR\"",
-				"\"audit:read\"", "\"users:read\"", "\"docs:read\"", "\"docs:write\"");
-	}
-
-	@Test
-	void aCallerWithoutRolesReadCannotListTheRolePermissionRegistry() throws Exception {
-		var nami = nami();
-
-		var request = get("/roles").with(asUserWithAuthorities(nami, NO_RELEVANT_PERMISSION));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 

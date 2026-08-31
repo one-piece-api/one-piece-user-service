@@ -20,6 +20,12 @@ public final class ApiPaths {
 
 	public static final String ROLES = "/roles";
 
+	public static final String ROLE_BY_NAME = "/roles/{role}";
+
+	public static final String ROLE_PERMISSION = "/roles/{role}/permissions/{permission}";
+
+	public static final String PERMISSIONS = "/permissions";
+
 	public static final String USER_RESEND_INVITATION = "/users/{userId}/resend-invitation";
 
 	public static final String USER_ROLE = "/users/{userId}/roles/{role}";

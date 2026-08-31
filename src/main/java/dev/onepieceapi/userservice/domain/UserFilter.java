@@ -6,7 +6,7 @@ package dev.onepieceapi.userservice.domain;
  * none. See {@code UserDirectoryPort#findUsers}/{@code #countUsers} for how a Keycloak
  * adapter applies it.
  */
-public record UserFilter(String query, RealmRole role, AccountStatus status) {
+public record UserFilter(String query, String role, AccountStatus status) {
 
 	private static final UserFilter NONE = new UserFilter(null, null, null);
 

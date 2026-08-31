@@ -4,7 +4,12 @@
 > `/admin` path prefix removed, by
 > [ADR-0009](0009-permission-based-endpoint-registry.md). The permission set itself below
 > is refined by [ADR-0011](0011-roles-read-and-roles-assign-permissions.md): a `roles:read`
-> permission is added, and `roles:write` is renamed `roles:assign`.
+> permission is added, and `roles:write` is renamed `roles:assign`. The in-app permission
+> editor this ADR deferred, and the "roles are fixed, edited only through Keycloak
+> itself" framing below, are superseded by
+> [ADR-0012](0012-role-permission-catalog-management.md): roles become fully dynamic and
+> the `RealmRole` enum this ADR's `Map<RealmRole, Set<Permission>>` alternative
+> references no longer exists.
 
 ## Context
 
