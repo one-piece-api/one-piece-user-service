@@ -33,7 +33,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
 @Slf4j
-public class AdminUserInvitationService {
+public class UserInvitationService {
 
 	private final UserDirectoryPort userDirectoryPort;
 

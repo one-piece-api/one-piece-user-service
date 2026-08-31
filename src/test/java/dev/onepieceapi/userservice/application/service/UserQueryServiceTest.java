@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AdminUserQueryServiceTest {
+class UserQueryServiceTest {
 
 	private static final UUID LUFFY_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
@@ -33,11 +33,11 @@ class AdminUserQueryServiceTest {
 	@Mock
 	private UserDirectoryPort userDirectoryPort;
 
-	private AdminUserQueryService adminUserQueryService;
+	private UserQueryService userQueryService;
 
 	@BeforeEach
 	void setUp() {
-		this.adminUserQueryService = new AdminUserQueryService(this.userDirectoryPort);
+		this.userQueryService = new UserQueryService(this.userDirectoryPort);
 	}
 
 	@Test
@@ -48,7 +48,7 @@ class AdminUserQueryServiceTest {
 		when(this.userDirectoryPort.findUsers(0, 20, UserFilter.none())).thenReturn(List.of(luffy));
 		when(this.userDirectoryPort.countUsers(UserFilter.none())).thenReturn(1L);
 
-		Page<User> page = this.adminUserQueryService.list(pageable, UserFilter.none());
+		Page<User> page = this.userQueryService.list(pageable, UserFilter.none());
 
 		assertThat(page.getContent()).containsExactly(luffy);
 	}
@@ -60,7 +60,7 @@ class AdminUserQueryServiceTest {
 		when(this.userDirectoryPort.findUsers(0, 1, UserFilter.none())).thenReturn(List.of(luffy));
 		when(this.userDirectoryPort.countUsers(UserFilter.none())).thenReturn(37L);
 
-		Page<User> page = this.adminUserQueryService.list(pageable, UserFilter.none());
+		Page<User> page = this.userQueryService.list(pageable, UserFilter.none());
 
 		assertThat(page.getTotalElements()).isEqualTo(37L);
 		assertThat(page.getContent()).hasSize(1);
@@ -75,7 +75,7 @@ class AdminUserQueryServiceTest {
 		when(this.userDirectoryPort.findUsers(0, 20, filter)).thenReturn(List.of(nami));
 		when(this.userDirectoryPort.countUsers(filter)).thenReturn(1L);
 
-		Page<User> page = this.adminUserQueryService.list(pageable, filter);
+		Page<User> page = this.userQueryService.list(pageable, filter);
 
 		assertThat(page.getContent()).containsExactly(nami);
 		assertThat(page.getTotalElements()).isEqualTo(1L);
@@ -87,7 +87,7 @@ class AdminUserQueryServiceTest {
 		var luffy = new User(LUFFY_ID, LUFFY_USERNAME, LUFFY_EMAIL, AccountStatus.ACTIVE, roles, null);
 		when(this.userDirectoryPort.findUser(LUFFY_ID)).thenReturn(luffy);
 
-		User result = this.adminUserQueryService.getUser(LUFFY_ID);
+		User result = this.userQueryService.getUser(LUFFY_ID);
 
 		assertThat(result).isEqualTo(luffy);
 	}
@@ -98,7 +98,7 @@ class AdminUserQueryServiceTest {
 				List.of("docs:read", "docs:write"));
 		when(this.userDirectoryPort.listRolePermissions()).thenReturn(expected);
 
-		Map<RealmRole, List<String>> result = this.adminUserQueryService.listRolePermissions();
+		Map<RealmRole, List<String>> result = this.userQueryService.listRolePermissions();
 
 		assertThat(result).isEqualTo(expected);
 	}

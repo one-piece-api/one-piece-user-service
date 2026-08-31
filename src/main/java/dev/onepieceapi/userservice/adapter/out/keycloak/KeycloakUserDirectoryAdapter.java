@@ -47,8 +47,8 @@ import java.util.stream.Stream;
 /**
  * Keycloak-backed implementation of {@link UserDirectoryPort} - the only place in this
  * codebase that talks to the Keycloak Admin API. Swapping identity providers means
- * writing a new adapter against this same port, not touching
- * {@code AdminUserQueryService} or the domain.
+ * writing a new adapter against this same port, not touching {@code UserQueryService} or
+ * the domain.
  */
 @Component
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })

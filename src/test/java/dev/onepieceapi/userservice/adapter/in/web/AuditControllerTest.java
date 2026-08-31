@@ -3,7 +3,7 @@ package dev.onepieceapi.userservice.adapter.in.web;
 import dev.onepieceapi.exception.web.ApplicationExceptionHandler;
 import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthenticationToken;
 import dev.onepieceapi.userservice.adapter.in.web.security.SecurityConfig;
-import dev.onepieceapi.userservice.application.service.AdminAuditQueryService;
+import dev.onepieceapi.userservice.application.service.AuditQueryService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
@@ -34,24 +34,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Imports the real {@link SecurityConfig} specifically to prove {@code GET /audit} is
  * gated by the {@code audit:read} permission authority - see
- * {@code docs/implementation-plan.md}'s Step 17 and {@link AdminUserControllerTest} for
- * the equivalent coverage of the other permission-gated endpoints.
+ * {@code docs/implementation-plan.md}'s Step 17 and {@link UserControllerTest} for the
+ * equivalent coverage of the other permission-gated endpoints.
  */
-@WebMvcTest(AdminAuditController.class)
+@WebMvcTest(AuditController.class)
 @Import({ SecurityConfig.class, ApplicationExceptionHandler.class })
-class AdminAuditControllerTest {
+class AuditControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
 
 	@MockitoBean
-	private AdminAuditQueryService adminAuditQueryService;
+	private AuditQueryService auditQueryService;
 
 	@Test
 	void aCallerWithTheAuditReadPermissionCanListEvents() throws Exception {
 		var event = new AuditEvent(AuditAction.USER_INVITED, UUID.randomUUID(), "luffy@onepiece.local",
 				UUID.randomUUID(), "usopp@onepiece.local", Instant.EPOCH);
-		when(this.adminAuditQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(event)));
+		when(this.auditQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(event)));
 
 		var request = get("/audit").with(asUserWithAuthorities("PERMISSION_audit:read"));
 		this.mockMvc.perform(request).andExpect(status().isOk());

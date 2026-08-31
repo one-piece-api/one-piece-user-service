@@ -17,7 +17,7 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
-public class AdminAuditQueryService {
+public class AuditQueryService {
 
 	private final AuditLogPort auditLogPort;
 

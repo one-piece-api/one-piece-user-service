@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
-public class AdminUserQueryService {
+public class UserQueryService {
 
 	private final UserDirectoryPort userDirectoryPort;
 

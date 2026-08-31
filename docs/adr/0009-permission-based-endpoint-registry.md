@@ -1,5 +1,8 @@
 # ADR-0009: Permission-Based Endpoint Registry, `/admin` Path Removal
 
+> The controller/service naming this ADR deliberately left unchanged (see "left unchanged"
+> below) is renamed after all by [ADR-0010](0010-rename-admin-controllers-and-services.md).
+
 ## Context
 
 ADR-0007 introduced fine-grained permissions (`users:read`, `users:invite`, `roles:write`,
@@ -36,7 +39,9 @@ controller exposes and the path `SecurityConfig` checks are structurally the sam
 never two copies that can diverge.
 
 `SecurityConfig.securityFilterChain` replaces its three hand-written `requestMatchers`
-rules with a loop over `SecuredEndpoint.values()`, applying each one's method/path/rule.
+rules with a single call to `SecuredEndpoint.configureAll(...)` - the enum owns iterating
+its own constants and applying each one's rule internally, so `SecurityConfig` stays
+unaware of how the registry is built, only that it can be applied.
 The `Permission` enum is a deliberately different call from ADR-0007's "no `Permission`
 enum" decision: that one was about the JWT-claim/wire-format path (`MeResponse.permissions`),
 where permissions are opaque pass-through strings and an enum would need a pointless

@@ -7,6 +7,7 @@ import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +33,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AdminUserInvitationServiceTest {
+class UserInvitationServiceTest {
 
 	private static final Instant NOW = Instant.parse("2026-08-23T10:00:00Z");
 
@@ -54,13 +55,13 @@ class AdminUserInvitationServiceTest {
 	@Captor
 	private ArgumentCaptor<AuditEvent> auditEventCaptor;
 
-	private AdminUserInvitationService adminUserInvitationService;
+	private UserInvitationService userInvitationService;
 
 	@BeforeEach
 	void setUp() {
 		var clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		var service = new AdminUserInvitationService(this.userDirectoryPort, this.auditLogPort, clock);
-		this.adminUserInvitationService = service;
+		var service = new UserInvitationService(this.userDirectoryPort, this.auditLogPort, clock);
+		this.userInvitationService = service;
 	}
 
 	@Test
@@ -69,7 +70,7 @@ class AdminUserInvitationServiceTest {
 		var invited = pendingInvitedUser();
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 
-		User result = this.adminUserInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
+		User result = this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
 
 		assertThat(result).isEqualTo(invited);
 		verify(this.auditLogPort).record(this.auditEventCaptor.capture());
@@ -88,7 +89,7 @@ class AdminUserInvitationServiceTest {
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles))
 			.thenThrow(new RuntimeException("Keycloak unreachable"));
 
-		assertThatThrownBy(() -> this.adminUserInvitationService.invite(INVITED_EMAIL, roles, ADMIN))
+		assertThatThrownBy(() -> this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN))
 			.isInstanceOf(RuntimeException.class);
 
 		verifyNoInteractions(this.auditLogPort);
@@ -102,9 +103,9 @@ class AdminUserInvitationServiceTest {
 		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
 		var auditFailure = new RuntimeException("Postgres unreachable");
 		doThrow(auditFailure).when(this.auditLogPort).record(any());
+		ThrowingCallable invite = () -> this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
 
-		assertThatThrownBy(() -> this.adminUserInvitationService.invite(INVITED_EMAIL, roles, ADMIN))
-			.isSameAs(auditFailure);
+		assertThatThrownBy(invite).isSameAs(auditFailure);
 
 		verify(this.userDirectoryPort).rollbackInvitation(INVITED_ID);
 	}
@@ -118,9 +119,9 @@ class AdminUserInvitationServiceTest {
 		doThrow(auditFailure).when(this.auditLogPort).record(any());
 		doThrow(new RuntimeException("Keycloak unreachable")).when(this.userDirectoryPort)
 			.rollbackInvitation(INVITED_ID);
+		ThrowingCallable invite = () -> this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
 
-		assertThatThrownBy(() -> this.adminUserInvitationService.invite(INVITED_EMAIL, roles, ADMIN))
-			.isSameAs(auditFailure);
+		assertThatThrownBy(invite).isSameAs(auditFailure);
 	}
 
 	@Test
@@ -128,7 +129,7 @@ class AdminUserInvitationServiceTest {
 		var pending = pendingInvitedUser();
 		when(this.userDirectoryPort.resendInvitation(INVITED_ID)).thenReturn(pending);
 
-		User result = this.adminUserInvitationService.resend(INVITED_ID, ADMIN);
+		User result = this.userInvitationService.resend(INVITED_ID, ADMIN);
 
 		assertThat(result).isEqualTo(pending);
 		verify(this.auditLogPort).record(this.auditEventCaptor.capture());
@@ -144,7 +145,7 @@ class AdminUserInvitationServiceTest {
 		when(this.userDirectoryPort.resendInvitation(INVITED_ID))
 			.thenThrow(new RuntimeException("Keycloak unreachable"));
 
-		assertThatThrownBy(() -> this.adminUserInvitationService.resend(INVITED_ID, ADMIN))
+		assertThatThrownBy(() -> this.userInvitationService.resend(INVITED_ID, ADMIN))
 			.isInstanceOf(RuntimeException.class);
 
 		verifyNoInteractions(this.auditLogPort);

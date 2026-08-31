@@ -14,13 +14,13 @@ import java.util.UUID;
 
 /**
  * UF-IDU-15/16: grants or revokes one realm role on an existing account. Like
- * {@link AdminUserInvitationService}'s resend, this mutates an account that already
- * exists rather than creating one, so an audit-write failure here is logged and rethrown,
- * not compensated for by undoing the role change.
+ * {@link UserInvitationService}'s resend, this mutates an account that already exists
+ * rather than creating one, so an audit-write failure here is logged and rethrown, not
+ * compensated for by undoing the role change.
  */
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
-public class AdminUserRoleService {
+public class UserRoleService {
 
 	private final UserDirectoryPort userDirectoryPort;
 

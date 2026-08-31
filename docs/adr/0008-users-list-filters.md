@@ -53,7 +53,7 @@ application owns), not a bigger cap.
 - `UserDirectoryPort#findUsers`/`#countUsers` gained a `UserFilter` parameter
   (`query`/`role`/`status`, all optional) - a breaking signature change for the port,
   updated at its one implementation (`KeycloakUserDirectoryAdapter`) and one caller
-  (`AdminUserQueryService`).
+  (`UserQueryService`, renamed from `AdminUserQueryService` by ADR-0010).
 - A filtered query costs one narrowing call plus up to `FILTER_CANDIDATE_CAP` per-user
   role/status resolutions (same concurrent pattern as the unfiltered path), then two
   in-memory passes (filter, paginate) - more expensive than the unfiltered path, bounded

@@ -5,10 +5,10 @@ import dev.onepieceapi.userservice.adapter.in.web.dto.PageResponse;
 import dev.onepieceapi.userservice.adapter.in.web.dto.RolePermissionsResponse;
 import dev.onepieceapi.userservice.adapter.in.web.dto.UserSummaryResponse;
 import dev.onepieceapi.userservice.adapter.in.web.mapper.UserSummaryResponseMapper;
-import dev.onepieceapi.userservice.application.service.AdminUserAccessService;
-import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
-import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
-import dev.onepieceapi.userservice.application.service.AdminUserRoleService;
+import dev.onepieceapi.userservice.application.service.UserAccessService;
+import dev.onepieceapi.userservice.application.service.UserInvitationService;
+import dev.onepieceapi.userservice.application.service.UserQueryService;
+import dev.onepieceapi.userservice.application.service.UserRoleService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
@@ -44,15 +44,15 @@ import java.util.UUID;
  */
 @RestController
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
-class AdminUserController {
+class UserController {
 
-	private final AdminUserQueryService adminUserQueryService;
+	private final UserQueryService userQueryService;
 
-	private final AdminUserInvitationService adminUserInvitationService;
+	private final UserInvitationService userInvitationService;
 
-	private final AdminUserRoleService adminUserRoleService;
+	private final UserRoleService userRoleService;
 
-	private final AdminUserAccessService adminUserAccessService;
+	private final UserAccessService userAccessService;
 
 	/**
 	 * {@code q}/{@code role}/{@code status} narrow the listing (Step 15) - any
@@ -63,14 +63,14 @@ class AdminUserController {
 	PageResponse<UserSummaryResponse> listUsers(Pageable pageable, @RequestParam Optional<String> q,
 			@RequestParam Optional<RealmRole> role, @RequestParam Optional<AccountStatus> status) {
 		var filter = new UserFilter(q.orElse(null), role.orElse(null), status.orElse(null));
-		Page<UserSummaryResponse> page = this.adminUserQueryService.list(pageable, filter)
+		Page<UserSummaryResponse> page = this.userQueryService.list(pageable, filter)
 			.map(UserSummaryResponseMapper::toResponse);
 		return PageResponse.from(page);
 	}
 
 	@GetMapping(ApiPaths.USER_BY_ID)
 	UserSummaryResponse getUser(@PathVariable UUID userId) {
-		return UserSummaryResponseMapper.toResponse(this.adminUserQueryService.getUser(userId));
+		return UserSummaryResponseMapper.toResponse(this.userQueryService.getUser(userId));
 	}
 
 	/**
@@ -81,7 +81,7 @@ class AdminUserController {
 	 */
 	@GetMapping(ApiPaths.ROLES)
 	List<RolePermissionsResponse> listRoles() {
-		Map<RealmRole, List<String>> rolePermissions = this.adminUserQueryService.listRolePermissions();
+		Map<RealmRole, List<String>> rolePermissions = this.userQueryService.listRolePermissions();
 		return rolePermissions.entrySet()
 			.stream()
 			.map(entry -> new RolePermissionsResponse(entry.getKey().name(), entry.getValue()))
@@ -92,39 +92,39 @@ class AdminUserController {
 	@PostMapping(ApiPaths.USERS)
 	ResponseEntity<UserSummaryResponse> inviteUser(@Valid @RequestBody InviteUserRequest request,
 			@AuthenticationPrincipal User user) {
-		var invited = this.adminUserInvitationService.invite(request.email(), request.roles(), user);
+		var invited = this.userInvitationService.invite(request.email(), request.roles(), user);
 		return ResponseEntity.status(HttpStatus.CREATED).body(UserSummaryResponseMapper.toResponse(invited));
 	}
 
 	@PostMapping(ApiPaths.USER_RESEND_INVITATION)
 	UserSummaryResponse resendInvitation(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
-		var target = this.adminUserInvitationService.resend(userId, user);
+		var target = this.userInvitationService.resend(userId, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
 	@PutMapping(ApiPaths.USER_ROLE)
 	UserSummaryResponse assignRole(@PathVariable UUID userId, @PathVariable RealmRole role,
 			@AuthenticationPrincipal User user) {
-		var target = this.adminUserRoleService.assignRole(userId, role, user);
+		var target = this.userRoleService.assignRole(userId, role, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
 	@DeleteMapping(ApiPaths.USER_ROLE)
 	UserSummaryResponse revokeRole(@PathVariable UUID userId, @PathVariable RealmRole role,
 			@AuthenticationPrincipal User user) {
-		var target = this.adminUserRoleService.revokeRole(userId, role, user);
+		var target = this.userRoleService.revokeRole(userId, role, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
 	@PostMapping(ApiPaths.USER_REVOKE_ACCESS)
 	UserSummaryResponse revokeAccess(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
-		var target = this.adminUserAccessService.revokeAccess(userId, user);
+		var target = this.userAccessService.revokeAccess(userId, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 
 	@PostMapping(ApiPaths.USER_REACTIVATE)
 	UserSummaryResponse reactivate(@PathVariable UUID userId, @AuthenticationPrincipal User user) {
-		var target = this.adminUserAccessService.reactivate(userId, user);
+		var target = this.userAccessService.reactivate(userId, user);
 		return UserSummaryResponseMapper.toResponse(target);
 	}
 

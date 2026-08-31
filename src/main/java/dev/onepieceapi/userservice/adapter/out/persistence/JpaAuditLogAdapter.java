@@ -34,7 +34,7 @@ public class JpaAuditLogAdapter implements AuditLogPort {
 
 	@Override
 	public List<AuditEvent> findEvents(int offset, int limit, UUID targetUserId) {
-		// offset is always page-aligned here: both callers (AdminAuditQueryService, its
+		// offset is always page-aligned here: both callers (AuditQueryService, its
 		// tests) derive it from a Pageable's own getOffset(), never an arbitrary value.
 		Pageable pageable = PageRequest.of(offset / limit, limit, Sort.by(Sort.Direction.DESC, "occurredAt"));
 		return findEntities(pageable, targetUserId).stream().map(JpaAuditLogAdapter::toDomain).toList();

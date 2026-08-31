@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AdminAuditQueryServiceTest {
+class AuditQueryServiceTest {
 
 	private static final UUID ACTOR_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
@@ -29,11 +29,11 @@ class AdminAuditQueryServiceTest {
 	@Mock
 	private AuditLogPort auditLogPort;
 
-	private AdminAuditQueryService adminAuditQueryService;
+	private AuditQueryService auditQueryService;
 
 	@BeforeEach
 	void setUp() {
-		this.adminAuditQueryService = new AdminAuditQueryService(this.auditLogPort);
+		this.auditQueryService = new AuditQueryService(this.auditLogPort);
 	}
 
 	@Test
@@ -43,7 +43,7 @@ class AdminAuditQueryServiceTest {
 		when(this.auditLogPort.findEvents(0, 20, null)).thenReturn(List.of(event));
 		when(this.auditLogPort.countEvents(null)).thenReturn(1L);
 
-		Page<AuditEvent> page = this.adminAuditQueryService.list(pageable, null);
+		Page<AuditEvent> page = this.auditQueryService.list(pageable, null);
 
 		assertThat(page.getContent()).containsExactly(event);
 	}
@@ -55,7 +55,7 @@ class AdminAuditQueryServiceTest {
 		when(this.auditLogPort.findEvents(0, 1, null)).thenReturn(List.of(event));
 		when(this.auditLogPort.countEvents(null)).thenReturn(37L);
 
-		Page<AuditEvent> page = this.adminAuditQueryService.list(pageable, null);
+		Page<AuditEvent> page = this.auditQueryService.list(pageable, null);
 
 		assertThat(page.getTotalElements()).isEqualTo(37L);
 		assertThat(page.getContent()).hasSize(1);
@@ -68,7 +68,7 @@ class AdminAuditQueryServiceTest {
 		when(this.auditLogPort.findEvents(0, 20, TARGET_ID)).thenReturn(List.of(event));
 		when(this.auditLogPort.countEvents(TARGET_ID)).thenReturn(1L);
 
-		Page<AuditEvent> page = this.adminAuditQueryService.list(pageable, TARGET_ID);
+		Page<AuditEvent> page = this.auditQueryService.list(pageable, TARGET_ID);
 
 		assertThat(page.getContent()).containsExactly(event);
 	}

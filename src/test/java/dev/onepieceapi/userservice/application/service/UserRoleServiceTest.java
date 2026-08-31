@@ -5,6 +5,7 @@ import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
+import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AdminUserAccessServiceTest {
+class UserRoleServiceTest {
 
 	private static final Instant NOW = Instant.parse("2026-08-25T10:00:00Z");
 
@@ -45,49 +46,48 @@ class AdminUserAccessServiceTest {
 	@Captor
 	private ArgumentCaptor<AuditEvent> auditEventCaptor;
 
-	private AdminUserAccessService adminUserAccessService;
+	private UserRoleService userRoleService;
 
 	@BeforeEach
 	void setUp() {
 		var clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		var service = new AdminUserAccessService(this.userDirectoryPort, this.auditLogPort, clock);
-		this.adminUserAccessService = service;
+		this.userRoleService = new UserRoleService(this.userDirectoryPort, this.auditLogPort, clock);
 	}
 
 	@Test
-	void revokesAccessAndRecordsWhoDidIt() {
-		var updated = targetUser(AccountStatus.DISABLED);
-		when(this.userDirectoryPort.revokeAccess(TARGET_ID)).thenReturn(updated);
+	void assignsARoleAndRecordsWhoDidIt() {
+		var updated = targetUser(List.of("EDITOR", "ADMIN"));
+		when(this.userDirectoryPort.assignRole(TARGET_ID, RealmRole.ADMIN)).thenReturn(updated);
 
-		User result = this.adminUserAccessService.revokeAccess(TARGET_ID, ADMIN);
+		User result = this.userRoleService.assignRole(TARGET_ID, RealmRole.ADMIN, ADMIN);
 
 		assertThat(result).isEqualTo(updated);
 		verify(this.auditLogPort).record(this.auditEventCaptor.capture());
 		AuditEvent event = this.auditEventCaptor.getValue();
-		assertThat(event.action()).isEqualTo(AuditAction.ACCESS_REVOKED);
+		assertThat(event.action()).isEqualTo(AuditAction.ROLE_ASSIGNED);
 		assertThat(event.actorUserId()).isEqualTo(ADMIN.userId());
 		assertThat(event.targetUserId()).isEqualTo(TARGET_ID);
 		assertThat(event.occurredAt()).isEqualTo(NOW);
 	}
 
 	@Test
-	void reactivatesAndRecordsWhoDidIt() {
-		var updated = targetUser(AccountStatus.ACTIVE);
-		when(this.userDirectoryPort.reactivate(TARGET_ID)).thenReturn(updated);
+	void revokesARoleAndRecordsWhoDidIt() {
+		var updated = targetUser(List.of("EDITOR"));
+		when(this.userDirectoryPort.revokeRole(TARGET_ID, RealmRole.ADMIN)).thenReturn(updated);
 
-		User result = this.adminUserAccessService.reactivate(TARGET_ID, ADMIN);
+		User result = this.userRoleService.revokeRole(TARGET_ID, RealmRole.ADMIN, ADMIN);
 
 		assertThat(result).isEqualTo(updated);
 		verify(this.auditLogPort).record(this.auditEventCaptor.capture());
 		AuditEvent event = this.auditEventCaptor.getValue();
-		assertThat(event.action()).isEqualTo(AuditAction.ACCESS_REACTIVATED);
+		assertThat(event.action()).isEqualTo(AuditAction.ROLE_REVOKED);
 		assertThat(event.actorUserId()).isEqualTo(ADMIN.userId());
 		assertThat(event.targetUserId()).isEqualTo(TARGET_ID);
 		assertThat(event.occurredAt()).isEqualTo(NOW);
 	}
 
-	private static User targetUser(AccountStatus status) {
-		return new User(TARGET_ID, "usopp", TARGET_EMAIL, status, List.of("EDITOR"), NOW);
+	private static User targetUser(List<String> roles) {
+		return new User(TARGET_ID, "usopp", TARGET_EMAIL, AccountStatus.ACTIVE, roles, NOW);
 	}
 
 }

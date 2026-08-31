@@ -8,10 +8,10 @@ import dev.onepieceapi.userservice.application.exception.InvitationNotResendable
 import dev.onepieceapi.userservice.application.exception.LastAdministratorException;
 import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
-import dev.onepieceapi.userservice.application.service.AdminUserAccessService;
-import dev.onepieceapi.userservice.application.service.AdminUserInvitationService;
-import dev.onepieceapi.userservice.application.service.AdminUserQueryService;
-import dev.onepieceapi.userservice.application.service.AdminUserRoleService;
+import dev.onepieceapi.userservice.application.service.UserAccessService;
+import dev.onepieceapi.userservice.application.service.UserInvitationService;
+import dev.onepieceapi.userservice.application.service.UserQueryService;
+import dev.onepieceapi.userservice.application.service.UserRoleService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.RealmRole;
 import dev.onepieceapi.userservice.domain.User;
@@ -53,7 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * controller logic given an already-authenticated principal. A caller lacking the
  * required permission is granted {@code PERMISSION_docs:read} (a real, unrelated EDITOR
  * permission) rather than no authorities at all, so these cases prove "wrong permission",
- * not just "no permission" - matching {@link AdminAuditControllerTest}'s
+ * not just "no permission" - matching {@link AuditControllerTest}'s
  * {@code aCallerWithNoRelevantAuthorityIsForbidden} style. Also imports the shared
  * library's {@link ApplicationExceptionHandler} directly - a {@code @WebMvcTest} slice
  * narrows auto-configuration to what the slice itself needs, so a third-party
@@ -61,9 +61,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * named explicitly (unlike {@code AdminUserListingIntegrationTest}'s full
  * {@code @SpringBootTest} context, which loads it automatically).
  */
-@WebMvcTest(AdminUserController.class)
+@WebMvcTest(UserController.class)
 @Import({ SecurityConfig.class, ApplicationExceptionHandler.class })
-class AdminUserControllerTest {
+class UserControllerTest {
 
 	private static final String NO_RELEVANT_PERMISSION = "PERMISSION_docs:read";
 
@@ -71,16 +71,16 @@ class AdminUserControllerTest {
 	private MockMvc mockMvc;
 
 	@MockitoBean
-	private AdminUserQueryService adminUserQueryService;
+	private UserQueryService userQueryService;
 
 	@MockitoBean
-	private AdminUserInvitationService adminUserInvitationService;
+	private UserInvitationService userInvitationService;
 
 	@MockitoBean
-	private AdminUserRoleService adminUserRoleService;
+	private UserRoleService userRoleService;
 
 	@MockitoBean
-	private AdminUserAccessService adminUserAccessService;
+	private UserAccessService userAccessService;
 
 	@Test
 	void aCallerWithUsersReadCanListUsers() throws Exception {
@@ -88,7 +88,7 @@ class AdminUserControllerTest {
 		List<String> roles = List.of("ADMIN");
 		AccountStatus status = AccountStatus.ACTIVE;
 		var account = new User(luffy.userId(), luffy.username(), luffy.email(), status, roles, Instant.EPOCH);
-		when(this.adminUserQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(account)));
+		when(this.userQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(account)));
 
 		var request = get("/users").with(asUserWithAuthorities(luffy, "PERMISSION_users:read"));
 		this.mockMvc.perform(request).andExpect(status().isOk());
@@ -101,8 +101,8 @@ class AdminUserControllerTest {
 		var account = new User(luffy.userId(), luffy.username(), luffy.email(), AccountStatus.ACTIVE, roles,
 				Instant.EPOCH);
 		var filterCaptor = ArgumentCaptor.forClass(UserFilter.class);
-		when(this.adminUserQueryService.list(any(), filterCaptor.capture()))
-			.thenReturn(new PageImpl<>(List.of(account)));
+		var page = new PageImpl<>(List.of(account));
+		when(this.userQueryService.list(any(), filterCaptor.capture())).thenReturn(page);
 
 		var request = get("/users?q=luf&role=ADMIN&status=ACTIVE")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_users:read"));
@@ -127,7 +127,7 @@ class AdminUserControllerTest {
 		UUID invitedId = UUID.randomUUID();
 		var invited = new User(invitedId, "usopp@onepiece.local", "usopp@onepiece.local", AccountStatus.PENDING,
 				invitedRoles, Instant.EPOCH);
-		when(this.adminUserInvitationService.invite("usopp@onepiece.local", Set.of(RealmRole.EDITOR), luffy))
+		when(this.userInvitationService.invite("usopp@onepiece.local", Set.of(RealmRole.EDITOR), luffy))
 			.thenReturn(invited);
 
 		var request = post("/users").with(asUserWithAuthorities(luffy, "PERMISSION_users:invite"))
@@ -153,7 +153,7 @@ class AdminUserControllerTest {
 	@Test
 	void invitingAnAlreadyRegisteredEmailReturnsConflict() throws Exception {
 		var luffy = luffy();
-		when(this.adminUserInvitationService.invite("usopp@onepiece.local", Set.of(RealmRole.EDITOR), luffy))
+		when(this.userInvitationService.invite("usopp@onepiece.local", Set.of(RealmRole.EDITOR), luffy))
 			.thenThrow(new EmailAlreadyRegisteredException("usopp@onepiece.local"));
 
 		var request = post("/users").with(asUserWithAuthorities(luffy, "PERMISSION_users:invite"))
@@ -184,7 +184,7 @@ class AdminUserControllerTest {
 		var targetId = UUID.randomUUID();
 		var target = new User(targetId, "usopp@onepiece.local", "usopp@onepiece.local", AccountStatus.PENDING,
 				List.of("EDITOR"), Instant.EPOCH);
-		when(this.adminUserInvitationService.resend(targetId, luffy)).thenReturn(target);
+		when(this.userInvitationService.resend(targetId, luffy)).thenReturn(target);
 
 		var request = post("/users/" + targetId + "/resend-invitation")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_users:invite"));
@@ -196,7 +196,7 @@ class AdminUserControllerTest {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
 		var notFound = new UserNotFoundException(targetId);
-		when(this.adminUserInvitationService.resend(targetId, luffy)).thenThrow(notFound);
+		when(this.userInvitationService.resend(targetId, luffy)).thenThrow(notFound);
 
 		var request = post("/users/" + targetId + "/resend-invitation")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_users:invite"));
@@ -207,7 +207,7 @@ class AdminUserControllerTest {
 	void resendingWhenNotResendableReturnsConflict() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
-		when(this.adminUserInvitationService.resend(targetId, luffy))
+		when(this.userInvitationService.resend(targetId, luffy))
 			.thenThrow(new InvitationNotResendableException(targetId));
 
 		var request = post("/users/" + targetId + "/resend-invitation")
@@ -230,7 +230,7 @@ class AdminUserControllerTest {
 	@Test
 	void aCallerWithUsersReadCanFetchASingleUser() throws Exception {
 		var luffy = luffy();
-		when(this.adminUserQueryService.getUser(luffy.userId())).thenReturn(luffy);
+		when(this.userQueryService.getUser(luffy.userId())).thenReturn(luffy);
 
 		var authority = asUserWithAuthorities(luffy, "PERMISSION_users:read");
 		var request = get("/users/" + luffy.userId()).with(authority);
@@ -241,7 +241,7 @@ class AdminUserControllerTest {
 	void fetchingAnUnknownUserReturnsNotFound() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
-		when(this.adminUserQueryService.getUser(targetId)).thenThrow(new UserNotFoundException(targetId));
+		when(this.userQueryService.getUser(targetId)).thenThrow(new UserNotFoundException(targetId));
 
 		var request = get("/users/" + targetId).with(asUserWithAuthorities(luffy, "PERMISSION_users:read"));
 		this.mockMvc.perform(request).andExpect(status().isNotFound());
@@ -261,7 +261,7 @@ class AdminUserControllerTest {
 		var targetId = UUID.randomUUID();
 		var updated = new User(targetId, "usopp", "usopp@onepiece.local", AccountStatus.ACTIVE,
 				List.of("EDITOR", "ADMIN"), Instant.EPOCH);
-		when(this.adminUserRoleService.assignRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
+		when(this.userRoleService.assignRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
 
 		var request = put("/users/" + targetId + "/roles/ADMIN")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:write"));
@@ -285,7 +285,7 @@ class AdminUserControllerTest {
 		List<String> roles = List.of("EDITOR");
 		String email = "usopp@onepiece.local";
 		var updated = new User(targetId, "usopp", email, AccountStatus.ACTIVE, roles, Instant.EPOCH);
-		when(this.adminUserRoleService.revokeRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
+		when(this.userRoleService.revokeRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
 
 		var request = delete("/users/" + targetId + "/roles/ADMIN")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:write"));
@@ -295,7 +295,7 @@ class AdminUserControllerTest {
 	@Test
 	void revokingTheLastAdministratorRoleReturnsConflict() throws Exception {
 		var luffy = luffy();
-		when(this.adminUserRoleService.revokeRole(luffy.userId(), RealmRole.ADMIN, luffy))
+		when(this.userRoleService.revokeRole(luffy.userId(), RealmRole.ADMIN, luffy))
 			.thenThrow(new LastAdministratorException(luffy.userId()));
 
 		var request = delete("/users/" + luffy.userId() + "/roles/ADMIN")
@@ -309,7 +309,7 @@ class AdminUserControllerTest {
 	void revokingAUsersLastRoleReturnsConflict() throws Exception {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
-		when(this.adminUserRoleService.revokeRole(targetId, RealmRole.EDITOR, luffy))
+		when(this.userRoleService.revokeRole(targetId, RealmRole.EDITOR, luffy))
 			.thenThrow(new LastRoleException(targetId, RealmRole.EDITOR));
 
 		var request = delete("/users/" + targetId + "/roles/EDITOR")
@@ -336,7 +336,7 @@ class AdminUserControllerTest {
 		List<String> roles = List.of("EDITOR");
 		String email = "usopp@onepiece.local";
 		var updated = new User(targetId, "usopp", email, AccountStatus.DISABLED, roles, Instant.EPOCH);
-		when(this.adminUserAccessService.revokeAccess(targetId, luffy)).thenReturn(updated);
+		when(this.userAccessService.revokeAccess(targetId, luffy)).thenReturn(updated);
 
 		var request = post("/users/" + targetId + "/revoke-access")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_access:write"));
@@ -346,7 +346,7 @@ class AdminUserControllerTest {
 	@Test
 	void revokingAccessFromTheLastAdministratorReturnsConflict() throws Exception {
 		var luffy = luffy();
-		when(this.adminUserAccessService.revokeAccess(luffy.userId(), luffy))
+		when(this.userAccessService.revokeAccess(luffy.userId(), luffy))
 			.thenThrow(new LastAdministratorException(luffy.userId()));
 
 		var request = post("/users/" + luffy.userId() + "/revoke-access")
@@ -361,7 +361,7 @@ class AdminUserControllerTest {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
 		var notFound = new UserNotFoundException(targetId);
-		when(this.adminUserAccessService.revokeAccess(targetId, luffy)).thenThrow(notFound);
+		when(this.userAccessService.revokeAccess(targetId, luffy)).thenThrow(notFound);
 
 		var request = post("/users/" + targetId + "/revoke-access")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_access:write"));
@@ -385,7 +385,7 @@ class AdminUserControllerTest {
 		List<String> roles = List.of("EDITOR");
 		String email = "usopp@onepiece.local";
 		var updated = new User(targetId, "usopp", email, AccountStatus.ACTIVE, roles, Instant.EPOCH);
-		when(this.adminUserAccessService.reactivate(targetId, luffy)).thenReturn(updated);
+		when(this.userAccessService.reactivate(targetId, luffy)).thenReturn(updated);
 
 		var request = post("/users/" + targetId + "/reactivate")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_access:write"));
@@ -397,7 +397,7 @@ class AdminUserControllerTest {
 		var luffy = luffy();
 		var targetId = UUID.randomUUID();
 		var notFound = new UserNotFoundException(targetId);
-		when(this.adminUserAccessService.reactivate(targetId, luffy)).thenThrow(notFound);
+		when(this.userAccessService.reactivate(targetId, luffy)).thenThrow(notFound);
 
 		var request = post("/users/" + targetId + "/reactivate")
 			.with(asUserWithAuthorities(luffy, "PERMISSION_access:write"));
@@ -419,7 +419,7 @@ class AdminUserControllerTest {
 		var luffy = luffy();
 		var rolePermissions = Map.of(RealmRole.ADMIN, List.of("audit:read", "users:read"), RealmRole.EDITOR,
 				List.of("docs:read", "docs:write"));
-		when(this.adminUserQueryService.listRolePermissions()).thenReturn(rolePermissions);
+		when(this.userQueryService.listRolePermissions()).thenReturn(rolePermissions);
 
 		var request = get("/roles").with(asUserWithAuthorities(luffy, "PERMISSION_users:read"));
 		var response = this.mockMvc.perform(request).andExpect(status().isOk()).andReturn().getResponse();

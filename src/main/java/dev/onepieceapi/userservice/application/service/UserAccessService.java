@@ -13,13 +13,13 @@ import java.util.UUID;
 
 /**
  * UF-IDU-13/14: revokes or restores an existing account's access. Like
- * {@link AdminUserRoleService}, this mutates an account that already exists rather than
+ * {@link UserRoleService}, this mutates an account that already exists rather than
  * creating one, so an audit-write failure here is logged and rethrown by the caller, not
  * compensated for by undoing the access change.
  */
 @Service
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
-public class AdminUserAccessService {
+public class UserAccessService {
 
 	private final UserDirectoryPort userDirectoryPort;
 
