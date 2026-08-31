@@ -25,11 +25,11 @@ enum SecuredEndpoint {
 
 	USERS_LIST(HttpMethod.GET, ApiPaths.USERS, permission(Permission.USERS_READ)),
 	USER_GET(HttpMethod.GET, ApiPaths.USER_BY_ID, permission(Permission.USERS_READ)),
-	ROLES_LIST(HttpMethod.GET, ApiPaths.ROLES, permission(Permission.USERS_READ)),
+	ROLES_LIST(HttpMethod.GET, ApiPaths.ROLES, permission(Permission.ROLES_READ)),
 	USER_INVITE(HttpMethod.POST, ApiPaths.USERS, permission(Permission.USERS_INVITE)),
 	USER_RESEND_INVITATION(HttpMethod.POST, ApiPaths.USER_RESEND_INVITATION, permission(Permission.USERS_INVITE)),
-	USER_ROLE_ASSIGN(HttpMethod.PUT, ApiPaths.USER_ROLE, permission(Permission.ROLES_WRITE)),
-	USER_ROLE_REVOKE(HttpMethod.DELETE, ApiPaths.USER_ROLE, permission(Permission.ROLES_WRITE)),
+	USER_ROLE_ASSIGN(HttpMethod.PUT, ApiPaths.USER_ROLE, permission(Permission.ROLES_ASSIGN)),
+	USER_ROLE_REVOKE(HttpMethod.DELETE, ApiPaths.USER_ROLE, permission(Permission.ROLES_ASSIGN)),
 	USER_REVOKE_ACCESS(HttpMethod.POST, ApiPaths.USER_REVOKE_ACCESS, permission(Permission.ACCESS_WRITE)),
 	USER_REACTIVATE(HttpMethod.POST, ApiPaths.USER_REACTIVATE, permission(Permission.ACCESS_WRITE)),
 	AUDIT_LIST(HttpMethod.GET, ApiPaths.AUDIT, permission(Permission.AUDIT_READ));

@@ -133,7 +133,8 @@ class AdminUserListingIntegrationTest {
 			.expectBody(String.class)
 			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"users:read\"")
 				.contains("\"users:invite\"")
-				.contains("\"roles:write\"")
+				.contains("\"roles:read\"")
+				.contains("\"roles:assign\"")
 				.contains("\"access:write\"")
 				.contains("\"audit:read\""));
 	}

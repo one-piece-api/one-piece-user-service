@@ -22,7 +22,9 @@ public enum Permission {
 
 	USERS_INVITE("users:invite"),
 
-	ROLES_WRITE("roles:write"),
+	ROLES_READ("roles:read"),
+
+	ROLES_ASSIGN("roles:assign"),
 
 	ACCESS_WRITE("access:write"),
 

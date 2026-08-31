@@ -2,7 +2,9 @@
 
 > Permission-based gating (this ADR's model) is completed for every endpoint, and the
 > `/admin` path prefix removed, by
-> [ADR-0009](0009-permission-based-endpoint-registry.md).
+> [ADR-0009](0009-permission-based-endpoint-registry.md). The permission set itself below
+> is refined by [ADR-0011](0011-roles-read-and-roles-assign-permissions.md): a `roles:read`
+> permission is added, and `roles:write` is renamed `roles:assign`.
 
 ## Context
 

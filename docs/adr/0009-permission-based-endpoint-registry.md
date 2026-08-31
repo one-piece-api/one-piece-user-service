@@ -33,7 +33,8 @@ REST endpoint's HTTP method, path and authorization rule. Each constant reads it
 **`ApiPaths`** (new, `adapter.in.web` - plain `public static final String` constants, not
 enum-backed, because Java annotation attributes require compile-time constant expressions
 that an enum accessor cannot provide) and its permission from **`Permission`** (new enum,
-`adapter.in.web.security`, five constants matching ADR-0007's mapping exactly). Controllers
+`adapter.in.web.security`, five constants matching ADR-0007's mapping exactly - refined to
+six by [ADR-0011](0011-roles-read-and-roles-assign-permissions.md)). Controllers
 reference the same `ApiPaths` constants in their mapping annotations, so the path a
 controller exposes and the path `SecurityConfig` checks are structurally the same value,
 never two copies that can diverge.

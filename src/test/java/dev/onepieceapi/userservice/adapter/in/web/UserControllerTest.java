@@ -264,7 +264,7 @@ class UserControllerTest {
 		when(this.userRoleService.assignRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
 
 		var request = put("/users/" + targetId + "/roles/ADMIN")
-			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:write"));
+			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:assign"));
 		this.mockMvc.perform(request).andExpect(status().isOk());
 	}
 
@@ -288,7 +288,7 @@ class UserControllerTest {
 		when(this.userRoleService.revokeRole(targetId, RealmRole.ADMIN, luffy)).thenReturn(updated);
 
 		var request = delete("/users/" + targetId + "/roles/ADMIN")
-			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:write"));
+			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:assign"));
 		this.mockMvc.perform(request).andExpect(status().isOk());
 	}
 
@@ -299,7 +299,7 @@ class UserControllerTest {
 			.thenThrow(new LastAdministratorException(luffy.userId()));
 
 		var request = delete("/users/" + luffy.userId() + "/roles/ADMIN")
-			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:write"));
+			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:assign"));
 		this.mockMvc.perform(request)
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.errorCode").value("USER_LAST_ADMINISTRATOR"));
@@ -313,7 +313,7 @@ class UserControllerTest {
 			.thenThrow(new LastRoleException(targetId, RealmRole.EDITOR));
 
 		var request = delete("/users/" + targetId + "/roles/EDITOR")
-			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:write"));
+			.with(asUserWithAuthorities(luffy, "PERMISSION_roles:assign"));
 		this.mockMvc.perform(request)
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.errorCode").value("USER_LAST_ROLE"));
@@ -415,13 +415,13 @@ class UserControllerTest {
 	}
 
 	@Test
-	void aCallerWithUsersReadCanListTheRolePermissionRegistry() throws Exception {
+	void aCallerWithRolesReadCanListTheRolePermissionRegistry() throws Exception {
 		var luffy = luffy();
 		var rolePermissions = Map.of(RealmRole.ADMIN, List.of("audit:read", "users:read"), RealmRole.EDITOR,
 				List.of("docs:read", "docs:write"));
 		when(this.userQueryService.listRolePermissions()).thenReturn(rolePermissions);
 
-		var request = get("/roles").with(asUserWithAuthorities(luffy, "PERMISSION_users:read"));
+		var request = get("/roles").with(asUserWithAuthorities(luffy, "PERMISSION_roles:read"));
 		var response = this.mockMvc.perform(request).andExpect(status().isOk()).andReturn().getResponse();
 
 		assertThat(response.getContentAsString()).contains("\"role\":\"ADMIN\"", "\"role\":\"EDITOR\"",
@@ -429,7 +429,7 @@ class UserControllerTest {
 	}
 
 	@Test
-	void aCallerWithoutUsersReadCannotListTheRolePermissionRegistry() throws Exception {
+	void aCallerWithoutRolesReadCannotListTheRolePermissionRegistry() throws Exception {
 		var nami = nami();
 
 		var request = get("/roles").with(asUserWithAuthorities(nami, NO_RELEVANT_PERMISSION));
