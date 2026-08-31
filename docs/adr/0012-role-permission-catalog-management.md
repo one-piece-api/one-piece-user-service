@@ -52,10 +52,17 @@ a role with members, or deleting/revoking `roles:manage` from the only role that
 it, is rejected (`RoleInUseException`/`LastRoleManagerException`, both 409) rather than
 silently leaving the catalog unmanageable.
 
-**The Keycloak service account (`user-service-admin`) is granted `manage-realm`**
-(realm-management), the only role granular enough to create/delete realm and client
-roles via the Admin API - replacing the previous `manage-users`-only surface for this
-concern. Applied to the already-running local cluster via a direct `kcadm.sh` grant
+**The Keycloak service account (`user-service-admin`) is granted `manage-realm`,
+`manage-clients`, `view-clients`, and `query-clients`** (all `realm-management` client
+roles), replacing the previous `manage-users`-only surface for this concern. Keycloak
+splits realm-role and client-role management into two separate resource types with
+their own permission checks - `manage-realm` alone (which has no composites of its own
+in this Keycloak version, confirmed by inspecting `GET .../roles/manage-realm/composites`)
+covers realm-role CRUD (`createRole`/`deleteRole`) but returns `403` on any client
+lookup (`clients().findByClientId(...)`, the first call every permission operation
+makes to resolve `onepiece-proxy`), a real failure this ADR's first grant attempt hit
+during manual verification against the live cluster, not something anticipated upfront.
+Applied to the already-running local cluster via a direct `kcadm.sh` grant
 (non-destructive - the existing realm's users, roles, and every other setting are
 untouched), with `realm-onepiece.json` updated to match so a future fresh import is
 already correct.
@@ -74,10 +81,12 @@ sometimes hold a non-email string.
   ADR). Avoids the `RealmRole` removal ripple entirely, but doesn't match the approved
   reference, which explicitly supports creating new roles by name. Rejected: the user
   confirmed matching the reference exactly over a narrower phase.
-- **A narrower Keycloak grant than `manage-realm`.** Keycloak's `realm-management`
-  client ships no role between "read/manage users" and "manage the whole realm" - there
-  is no built-in "manage roles only" role. Rejected for lack of a narrower option;
-  accepted as a real trade-off below rather than worked around with a custom
+- **A narrower Keycloak grant than `manage-realm` plus the three client-management
+  roles.** Keycloak's `realm-management` client ships no role between "read/manage
+  users" and "manage the whole realm" for realm roles, and no combined
+  "manage-this-one-client" role scoped to just `onepiece-proxy` for client roles - the
+  available roles are as granular as Keycloak gets. Rejected for lack of a narrower
+  option; accepted as a real trade-off below rather than worked around with a custom
   authorization mechanism (this project's standing preference for standard solutions
   over custom ones).
 - **Overload `targetEmail` to sometimes hold a role/permission name** instead of adding
@@ -86,13 +95,15 @@ sometimes hold a non-email string.
 
 ## Consequences
 
-- **`manage-realm` is a materially broader credential than this service held before** -
-  it can modify realm settings, clients, and every role, not just users. Accepted because
-  Keycloak doesn't expose a narrower built-in role for "manage roles/client-roles only";
-  the alternative (a custom authorization shim narrowing it) would violate this project's
-  preference for standard mechanisms over custom ones for a marginal blast-radius
-  reduction that the application code itself doesn't rely on (it only ever calls the
-  subset of Admin API operations this feature needs).
+- **The new grant set is materially broader than this service held before** -
+  `manage-realm` can modify realm settings and every realm role, and `manage-clients`
+  can modify every client in the realm (not just `onepiece-proxy`), not just users.
+  Accepted because Keycloak doesn't expose a narrower built-in role for "manage
+  roles/client-roles only" or "manage this one client only"; the alternative (a custom
+  authorization shim narrowing it) would violate this project's preference for standard
+  mechanisms over custom ones for a marginal blast-radius reduction that the application
+  code itself doesn't rely on (it only ever calls the subset of Admin API operations
+  this feature needs).
 - **The `RealmRole` enum removal ripples through every existing role touchpoint**, not
   just the new screen: the invite form's role selection, the user-list role filter, and
   assign/revoke all move from a closed Java enum to a string validated against

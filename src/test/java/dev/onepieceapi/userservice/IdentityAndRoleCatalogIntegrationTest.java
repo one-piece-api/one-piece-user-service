@@ -31,19 +31,23 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Exercises the ADMIN user listing (UF-IDU-17) and invite endpoint (UF-IDU-01) against a
- * real Keycloak (Testcontainers), not Mockito mocks: the full security filter chain
- * (including the "sub"-based {@code ApplicationUserJwtAuthenticationConverter} resolution
- * and {@code SecuredEndpoint}'s permission-authority rules, proven here against real
+ * Exercises the ADMIN user listing (UF-IDU-17), invite endpoint (UF-IDU-01), and the
+ * role/permission catalog (ADR-0012) against a real Keycloak (Testcontainers), not
+ * Mockito mocks: the full security filter chain (including the "sub"-based
+ * {@code ApplicationUserJwtAuthenticationConverter} resolution and
+ * {@code SecuredEndpoint}'s permission-authority rules, proven here against real
  * composite-role-derived JWTs rather than mocked authorities) and the real Admin REST API
- * call chain in {@code KeycloakUserDirectoryAdapter} all run against a dedicated realm
- * imported just for this test. A real Postgres (Testcontainers) backs the audit log the
- * invite endpoint writes to.
+ * call chains in
+ * {@code KeycloakUserDirectoryAdapter}/{@code KeycloakRoleDirectoryAdapter} all run
+ * against a dedicated realm imported just for this test - including the exact
+ * service-account grant set (see {@code onepiece-realm.json}) the role/client CRUD needs,
+ * which a Mockito-mocked {@code Keycloak} client cannot verify. A real Postgres
+ * (Testcontainers) backs the audit log the invite endpoint writes to.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @Testcontainers
-class AdminUserListingIntegrationTest {
+class IdentityAndRoleCatalogIntegrationTest {
 
 	// The fake SMTP server's fixed port (see GREEN_MAIL below) - must be registered for
 	// container-network forwarding before KEYCLOAK starts, since the realm fixture's
@@ -78,7 +82,7 @@ class AdminUserListingIntegrationTest {
 	@DynamicPropertySource
 	static void keycloakProperties(DynamicPropertyRegistry registry) {
 		registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri",
-				AdminUserListingIntegrationTest::issuerUri);
+				IdentityAndRoleCatalogIntegrationTest::issuerUri);
 		registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri",
 				() -> issuerUri() + "/protocol/openid-connect/certs");
 		registry.add("keycloak.admin.server-url", KEYCLOAK::getAuthServerUrl);
@@ -380,6 +384,198 @@ class AdminUserListingIntegrationTest {
 			.exchange()
 			.expectStatus()
 			.isForbidden();
+	}
+
+	@Test
+	void anAdminCanListEveryPermissionInTheClient() {
+		this.restTestClient.get()
+			.uri("/permissions")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"key\":\"users:read\"")
+				.contains("\"key\":\"roles:manage\""));
+	}
+
+	@Test
+	void aNonAdminCannotManageTheRoleCatalog() {
+		String namiToken = tokenFor("nami", "nami-pass");
+
+		this.restTestClient.post()
+			.uri("/roles")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + namiToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"name": "SCOUT"}
+					""")
+			.exchange()
+			.expectStatus()
+			.isForbidden();
+	}
+
+	@Test
+	void anAdminCanCreateAndDeleteARole() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+
+		this.restTestClient.post()
+			.uri("/roles")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"name": "navigator"}
+					""")
+			.exchange()
+			.expectStatus()
+			.isCreated()
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"role\":\"NAVIGATOR\""));
+
+		this.restTestClient.delete()
+			.uri("/roles/NAVIGATOR")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isNoContent();
+	}
+
+	@Test
+	void anAdminCanCreateARoleCopyingPermissionsFromAnotherRole() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+
+		String body = this.restTestClient.post()
+			.uri("/roles")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"name": "scout", "copyFromRole": "REVIEWER"}
+					""")
+			.exchange()
+			.expectStatus()
+			.isCreated()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		assertThat(body).contains("\"role\":\"SCOUT\"").contains("\"docs:read\"").contains("\"docs:review\"");
+
+		this.restTestClient.delete()
+			.uri("/roles/SCOUT")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isNoContent();
+	}
+
+	@Test
+	void creatingADuplicateRoleIsRejected() {
+		this.restTestClient.post()
+			.uri("/roles")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"name": "ADMIN"}
+					""")
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody())
+				.contains("\"errorCode\":\"USER_ROLE_ALREADY_EXISTS\""));
+	}
+
+	@Test
+	void deletingARoleWithMembersIsRejected() {
+		String body = this.restTestClient.delete()
+			.uri("/roles/EDITOR")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		assertThat(body).contains("\"errorCode\":\"USER_ROLE_IN_USE\"");
+	}
+
+	@Test
+	void anAdminCanCreateAssignAndRevokeAPermission() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+
+		String createdPermission = this.restTestClient.post()
+			.uri("/permissions")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"key": "docs:approve", "description": "Approve documents"}
+					""")
+			.exchange()
+			.expectStatus()
+			.isCreated()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		assertThat(createdPermission).contains("\"key\":\"docs:approve\"");
+
+		this.restTestClient.put()
+			.uri("/roles/EDITOR/permissions/docs:approve")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isNoContent();
+
+		String rolesWithNewPermission = this.restTestClient.get()
+			.uri("/roles")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isOk()
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		assertThat(rolesWithNewPermission).contains("\"role\":\"EDITOR\",\"permissions\":");
+		assertThat(rolesWithNewPermission).contains("docs:approve");
+
+		this.restTestClient.delete()
+			.uri("/roles/EDITOR/permissions/docs:approve")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isNoContent();
+	}
+
+	@Test
+	void creatingADuplicatePermissionIsRejected() {
+		this.restTestClient.post()
+			.uri("/permissions")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"key": "users:read", "description": "dup"}
+					""")
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody())
+				.contains("\"errorCode\":\"USER_PERMISSION_ALREADY_EXISTS\""));
+	}
+
+	/**
+	 * The fixture realm's ADMIN role is the only one holding {@code roles:manage} -
+	 * rejecting this leaves that invariant intact for every other test in this class.
+	 */
+	@Test
+	void revokingTheLastRolesManagePermissionIsRejected() {
+		this.restTestClient.delete()
+			.uri("/roles/ADMIN/permissions/roles:manage")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.consumeWith(result -> assertThat(result.getResponseBody())
+				.contains("\"errorCode\":\"USER_LAST_ROLE_MANAGER\""));
 	}
 
 	private String inviteAndGetUserId(String email, String role, String adminToken) {
