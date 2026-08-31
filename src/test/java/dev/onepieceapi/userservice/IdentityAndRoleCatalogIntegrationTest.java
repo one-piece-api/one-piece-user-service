@@ -154,8 +154,7 @@ class IdentityAndRoleCatalogIntegrationTest {
 			.expectBody(String.class)
 			.consumeWith(result -> assertThat(result.getResponseBody()).contains("\"role\":\"ADMIN\"")
 				.contains("\"users:read\"")
-				.contains("\"role\":\"EDITOR\"")
-				.contains("\"docs:write\""));
+				.contains("\"role\":\"EDITOR\",\"permissions\":[]"));
 	}
 
 	@Test
@@ -449,7 +448,7 @@ class IdentityAndRoleCatalogIntegrationTest {
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
 			.contentType(MediaType.APPLICATION_JSON)
 			.body("""
-					{"name": "scout", "copyFromRole": "REVIEWER"}
+					{"name": "scout", "copyFromRole": "ADMIN"}
 					""")
 			.exchange()
 			.expectStatus()
@@ -457,7 +456,7 @@ class IdentityAndRoleCatalogIntegrationTest {
 			.expectBody(String.class)
 			.returnResult()
 			.getResponseBody();
-		assertThat(body).contains("\"role\":\"SCOUT\"").contains("\"docs:read\"").contains("\"docs:review\"");
+		assertThat(body).contains("\"role\":\"SCOUT\"").contains("\"users:read\"").contains("\"audit:read\"");
 
 		this.restTestClient.delete()
 			.uri("/roles/SCOUT")

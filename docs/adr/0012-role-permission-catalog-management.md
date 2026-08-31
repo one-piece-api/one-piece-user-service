@@ -110,6 +110,17 @@ sometimes hold a non-email string.
   `RoleDirectoryPort#listRoles()` at runtime. `docs/adr/0007-permissions-as-keycloak-composite-roles.md`
   and `docs/adr/0011-roles-read-and-roles-assign-permissions.md` gain forward-pointer
   notes where they described roles as fixed or permission-editing as Keycloak-only.
+- **The `docs:read`/`docs:review`/`docs:write` permissions are removed from the
+  registry**, along with REVIEWER's and EDITOR's composite membership in them - they
+  existed only as placeholders for the "Documenti" feature ADR-0007 never built (Step 18,
+  descoped) and had no backend enforcement anywhere (no controller ever checked them).
+  Now that the catalog is directly operator-manageable, keeping unused demo permissions
+  around adds confusion, not value. REVIEWER and EDITOR keep existing (now with zero
+  permissions) rather than being deleted, since removing the roles themselves was not
+  requested and is a materially different, larger decision. `scripts/configure-role-catalog-permissions.sh`
+  (`onepiece-infrastructure`) removes these from an already-existing realm the same way
+  it fixes up the `roles:manage` grant, since deleting them from `realm-onepiece.json`
+  alone does not reach an already-imported realm either.
 - **Provisioning a realm that already exists is not automatic** (the same
   `--import-realm` limitation ADR-0011 already documented, `keycloak/keycloak#14884`) -
   the live local cluster's grant was applied directly via `kcadm.sh`, not a realm

@@ -9,7 +9,10 @@
 > itself" framing below, are superseded by
 > [ADR-0012](0012-role-permission-catalog-management.md): roles become fully dynamic and
 > the `RealmRole` enum this ADR's `Map<RealmRole, Set<Permission>>` alternative
-> references no longer exists.
+> references no longer exists. The `docs:read`/`docs:review`/`docs:write` permissions in
+> the table below - always placeholders for the never-built "Documenti" feature (Step 18,
+> descoped) - are removed entirely once the catalog is operator-manageable; REVIEWER and
+> EDITOR keep existing with zero permissions rather than being deleted outright.
 
 ## Context
 
