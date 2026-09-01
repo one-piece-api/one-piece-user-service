@@ -23,6 +23,12 @@
 
 	<property name="severity" value="error"/>
 	<property name="fileExtensions" value="java"/>
+	<!-- Matches spring-javaformat's own line-wrap budget: it counts each leading
+	     indentation tab as a single column, not Checkstyle's historical default of
+	     expanding a tab to 8 - without this, the two tools disagree about whether a
+	     deeply-indented line is within the 120-column limit, contradicting the "don't
+	     duplicate what the formatter already enforces" intent below. -->
+	<property name="tabWidth" value="1"/>
 
 	<module name="SuppressionFilter">
 		<property name="file" value="${config_loc}/checkstyle-suppressions.xml"/>
@@ -32,6 +38,10 @@
 	<module name="FileLength"/>
 	<module name="LineLength">
 		<property name="max" value="120"/>
+		<!-- A fully-qualified import can't be wrapped across lines the way any other
+		     Java statement can, so a long one is a false positive here, not a real
+		     style issue. -->
+		<property name="ignorePattern" value="^import "/>
 	</module>
 
 	<module name="RegexpSingleline">

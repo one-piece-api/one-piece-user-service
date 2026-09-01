@@ -5,6 +5,7 @@ import dev.onepieceapi.userservice.adapter.in.web.dto.PageResponse;
 import dev.onepieceapi.userservice.adapter.in.web.mapper.AuditEventResponseMapper;
 import dev.onepieceapi.userservice.application.service.AuditQueryService;
 import dev.onepieceapi.userservice.domain.AuditAction;
+import dev.onepieceapi.userservice.domain.AuditEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -35,9 +36,8 @@ class AuditController {
 	PageResponse<AuditEventResponse> list(Pageable pageable, @RequestParam(required = false) UUID userId,
 			@RequestParam(required = false) Set<AuditAction> actions, @RequestParam(required = false) String actorEmail,
 			@RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
-		Page<AuditEventResponse> page = this.auditQueryService.list(pageable, userId, actions, actorEmail, from, to)
-			.map(AuditEventResponseMapper::toResponse);
-		return PageResponse.from(page);
+		Page<AuditEvent> page = this.auditQueryService.list(pageable, userId, actions, actorEmail, from, to);
+		return PageResponse.from(page.map(AuditEventResponseMapper::toResponse));
 	}
 
 	/**

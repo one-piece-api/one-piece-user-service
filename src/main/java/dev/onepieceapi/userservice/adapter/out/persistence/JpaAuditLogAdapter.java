@@ -62,7 +62,8 @@ public class JpaAuditLogAdapter implements AuditLogPort {
 				predicates.add(cb.equal(root.get("targetUserId"), filter.targetUserId()));
 			}
 			if (!filter.actions().isEmpty()) {
-				predicates.add(root.get("action").in(filter.actions().stream().map(AuditAction::name).toList()));
+				List<String> actionNames = filter.actions().stream().map(AuditAction::name).toList();
+				predicates.add(root.get("action").in(actionNames));
 			}
 			if (filter.actorEmail() != null) {
 				predicates.add(cb.equal(root.get("actorEmail"), filter.actorEmail()));

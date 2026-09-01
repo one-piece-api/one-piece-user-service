@@ -125,8 +125,10 @@ class JpaAuditLogAdapterTest {
 	void findsOnlyEventsMatchingOneOfTheGivenActions() {
 		var actorId = UUID.randomUUID();
 		var targetId = UUID.randomUUID();
-		this.jpaAuditLogAdapter.record(new AuditEvent(AuditAction.ROLE_ASSIGNED, actorId, "luffy@onepiece.local",
-				targetId, "usopp@onepiece.local", "NAVIGATOR", Instant.parse("2026-08-23T10:00:00Z")));
+		var roleAssignedAt = Instant.parse("2026-08-23T10:00:00Z");
+		var roleAssigned = new AuditEvent(AuditAction.ROLE_ASSIGNED, actorId, "luffy@onepiece.local", targetId,
+				"usopp@onepiece.local", "NAVIGATOR", roleAssignedAt);
+		this.jpaAuditLogAdapter.record(roleAssigned);
 		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T11:00:00Z")));
 
 		var filter = AuditLogFilter.of(null, Set.of(AuditAction.ROLE_ASSIGNED), null, null, null);
@@ -164,8 +166,8 @@ class JpaAuditLogAdapterTest {
 		var filter = AuditLogFilter.of(null, null, null, LocalDate.of(2026, 8, 23), LocalDate.of(2026, 8, 24));
 		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, filter);
 
-		assertThat(events).extracting(AuditEvent::occurredAt)
-			.containsExactlyInAnyOrder(Instant.parse("2026-08-23T10:00:00Z"), Instant.parse("2026-08-24T23:59:59Z"));
+		var withinRange = List.of(Instant.parse("2026-08-23T10:00:00Z"), Instant.parse("2026-08-24T23:59:59Z"));
+		assertThat(events).extracting(AuditEvent::occurredAt).containsExactlyInAnyOrderElementsOf(withinRange);
 		assertThat(this.jpaAuditLogAdapter.countEvents(filter)).isEqualTo(2);
 	}
 

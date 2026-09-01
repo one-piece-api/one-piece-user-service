@@ -84,23 +84,24 @@ class AuditQueryServiceTest {
 		Pageable pageable = PageRequest.of(0, 20);
 		var event = anEvent();
 		var actions = Set.of(AuditAction.ROLE_ASSIGNED);
+		var actorEmail = "luffy@onepiece.local";
 		var from = LocalDate.of(2026, 8, 1);
 		var to = LocalDate.of(2026, 8, 31);
-		var filter = AuditLogFilter.of(null, actions, "luffy@onepiece.local", from, to);
+		var filter = AuditLogFilter.of(null, actions, actorEmail, from, to);
 		when(this.auditLogPort.findEvents(0, 20, filter)).thenReturn(List.of(event));
 		when(this.auditLogPort.countEvents(filter)).thenReturn(1L);
 
-		Page<AuditEvent> page = this.auditQueryService.list(pageable, null, actions, "luffy@onepiece.local", from, to);
+		Page<AuditEvent> page = this.auditQueryService.list(pageable, null, actions, actorEmail, from, to);
 
 		assertThat(page.getContent()).containsExactly(event);
 	}
 
 	@Test
 	void listsEveryDistinctActorForTheAuthorFilter() {
-		when(this.auditLogPort.listDistinctActorEmails())
-			.thenReturn(List.of("luffy@onepiece.local", "nami@onepiece.local"));
+		var actors = List.of("luffy@onepiece.local", "nami@onepiece.local");
+		when(this.auditLogPort.listDistinctActorEmails()).thenReturn(actors);
 
-		assertThat(this.auditQueryService.listActors()).containsExactly("luffy@onepiece.local", "nami@onepiece.local");
+		assertThat(this.auditQueryService.listActors()).containsExactlyElementsOf(actors);
 	}
 
 	private static AuditEvent anEvent() {
