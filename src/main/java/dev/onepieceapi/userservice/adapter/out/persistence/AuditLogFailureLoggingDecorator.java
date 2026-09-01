@@ -2,6 +2,7 @@ package dev.onepieceapi.userservice.adapter.out.persistence;
 
 import dev.onepieceapi.userservice.application.port.out.AuditLogPort;
 import dev.onepieceapi.userservice.domain.AuditEvent;
+import dev.onepieceapi.userservice.domain.AuditLogFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +10,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Decorates {@link JpaAuditLogAdapter} so every {@link AuditLogPort} caller gets the same
@@ -44,13 +44,18 @@ public class AuditLogFailureLoggingDecorator implements AuditLogPort {
 	}
 
 	@Override
-	public List<AuditEvent> findEvents(int offset, int limit, UUID targetUserId) {
-		return this.delegate.findEvents(offset, limit, targetUserId);
+	public List<AuditEvent> findEvents(int offset, int limit, AuditLogFilter filter) {
+		return this.delegate.findEvents(offset, limit, filter);
 	}
 
 	@Override
-	public long countEvents(UUID targetUserId) {
-		return this.delegate.countEvents(targetUserId);
+	public long countEvents(AuditLogFilter filter) {
+		return this.delegate.countEvents(filter);
+	}
+
+	@Override
+	public List<String> listDistinctActorEmails() {
+		return this.delegate.listDistinctActorEmails();
 	}
 
 }

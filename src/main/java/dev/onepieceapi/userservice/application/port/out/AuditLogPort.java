@@ -1,9 +1,9 @@
 package dev.onepieceapi.userservice.application.port.out;
 
 import dev.onepieceapi.userservice.domain.AuditEvent;
+import dev.onepieceapi.userservice.domain.AuditLogFilter;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Outbound port for recording and reading audit events (§13 of
@@ -16,15 +16,12 @@ public interface AuditLogPort {
 
 	void record(AuditEvent event);
 
-	/**
-	 * Newest-first. Mirrors {@link UserDirectoryPort#findUsers}'s offset/limit shape
-	 * (kept consistent across both ports rather than switching to Spring Data's
-	 * {@code Pageable} here just because the underlying store happens to be JPA) -
-	 * {@code targetUserId ==
-	 * null} returns every record (Step 17), otherwise only the ones for that user.
-	 */
-	List<AuditEvent> findEvents(int offset, int limit, UUID targetUserId);
+	/** Newest-first, every {@link AuditLogFilter} field ANDed together. */
+	List<AuditEvent> findEvents(int offset, int limit, AuditLogFilter filter);
 
-	long countEvents(UUID targetUserId);
+	long countEvents(AuditLogFilter filter);
+
+	/** Every actor who has ever recorded an event, sorted, for the Ship's Log author filter. */
+	List<String> listDistinctActorEmails();
 
 }

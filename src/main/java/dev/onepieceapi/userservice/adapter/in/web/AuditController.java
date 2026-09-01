@@ -4,6 +4,7 @@ import dev.onepieceapi.userservice.adapter.in.web.dto.AuditEventResponse;
 import dev.onepieceapi.userservice.adapter.in.web.dto.PageResponse;
 import dev.onepieceapi.userservice.adapter.in.web.mapper.AuditEventResponseMapper;
 import dev.onepieceapi.userservice.application.service.AuditQueryService;
+import dev.onepieceapi.userservice.domain.AuditAction;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -12,6 +13,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -28,10 +32,19 @@ class AuditController {
 	private final AuditQueryService auditQueryService;
 
 	@GetMapping(ApiPaths.AUDIT)
-	PageResponse<AuditEventResponse> list(Pageable pageable, @RequestParam(required = false) UUID userId) {
-		Page<AuditEventResponse> page = this.auditQueryService.list(pageable, userId)
+	PageResponse<AuditEventResponse> list(Pageable pageable, @RequestParam(required = false) UUID userId,
+			@RequestParam(required = false) Set<AuditAction> actions,
+			@RequestParam(required = false) String actorEmail,
+			@RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
+		Page<AuditEventResponse> page = this.auditQueryService.list(pageable, userId, actions, actorEmail, from, to)
 			.map(AuditEventResponseMapper::toResponse);
 		return PageResponse.from(page);
+	}
+
+	/** Every actor who has ever recorded an event, sorted - powers the Ship's Log author filter. */
+	@GetMapping(ApiPaths.AUDIT_ACTORS)
+	List<String> listActors() {
+		return this.auditQueryService.listActors();
 	}
 
 }

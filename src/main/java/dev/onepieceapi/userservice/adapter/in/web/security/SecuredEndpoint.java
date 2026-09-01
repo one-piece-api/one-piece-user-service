@@ -39,7 +39,8 @@ enum SecuredEndpoint {
 	USER_ROLE_REVOKE(HttpMethod.DELETE, ApiPaths.USER_ROLE, permission(Permission.ROLES_ASSIGN)),
 	USER_REVOKE_ACCESS(HttpMethod.POST, ApiPaths.USER_REVOKE_ACCESS, permission(Permission.ACCESS_WRITE)),
 	USER_REACTIVATE(HttpMethod.POST, ApiPaths.USER_REACTIVATE, permission(Permission.ACCESS_WRITE)),
-	AUDIT_LIST(HttpMethod.GET, ApiPaths.AUDIT, permission(Permission.AUDIT_READ));
+	AUDIT_LIST(HttpMethod.GET, ApiPaths.AUDIT, permission(Permission.AUDIT_READ)),
+	AUDIT_ACTORS_LIST(HttpMethod.GET, ApiPaths.AUDIT_ACTORS, permission(Permission.AUDIT_READ));
 
 	private final HttpMethod method;
 

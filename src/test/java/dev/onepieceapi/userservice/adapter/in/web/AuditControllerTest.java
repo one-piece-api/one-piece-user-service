@@ -51,7 +51,8 @@ class AuditControllerTest {
 	void aCallerWithTheAuditReadPermissionCanListEvents() throws Exception {
 		var event = new AuditEvent(AuditAction.USER_INVITED, UUID.randomUUID(), "luffy@onepiece.local",
 				UUID.randomUUID(), "usopp@onepiece.local", null, Instant.EPOCH);
-		when(this.auditQueryService.list(any(), any())).thenReturn(new PageImpl<>(List.of(event)));
+		when(this.auditQueryService.list(any(), any(), any(), any(), any(), any()))
+			.thenReturn(new PageImpl<>(List.of(event)));
 
 		var request = get("/audit").with(asUserWithAuthorities("PERMISSION_audit:read"));
 		this.mockMvc.perform(request).andExpect(status().isOk());
@@ -66,6 +67,20 @@ class AuditControllerTest {
 	@Test
 	void aCallerWithNoRelevantAuthorityIsForbidden() throws Exception {
 		var request = get("/audit").with(asUserWithAuthorities("PERMISSION_docs:read"));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void aCallerWithTheAuditReadPermissionCanListActors() throws Exception {
+		when(this.auditQueryService.listActors()).thenReturn(List.of("luffy@onepiece.local"));
+
+		var request = get("/audit/actors").with(asUserWithAuthorities("PERMISSION_audit:read"));
+		this.mockMvc.perform(request).andExpect(status().isOk());
+	}
+
+	@Test
+	void aCallerWithoutTheAuditReadPermissionIsForbiddenFromListingActors() throws Exception {
+		var request = get("/audit/actors").with(asUserWithAuthorities("ROLE_ADMIN"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 

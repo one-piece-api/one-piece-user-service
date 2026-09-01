@@ -2,6 +2,7 @@ package dev.onepieceapi.userservice.adapter.out.persistence;
 
 import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
+import dev.onepieceapi.userservice.domain.AuditLogFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,12 +54,19 @@ class AuditLogFailureLoggingDecoratorTest {
 
 	@Test
 	void delegatesReadsUnchanged() {
-		UUID targetUserId = UUID.randomUUID();
-		when(this.delegate.findEvents(0, 10, targetUserId)).thenReturn(List.of(EVENT));
-		when(this.delegate.countEvents(targetUserId)).thenReturn(1L);
+		var filter = AuditLogFilter.forTargetUser(UUID.randomUUID());
+		when(this.delegate.findEvents(0, 10, filter)).thenReturn(List.of(EVENT));
+		when(this.delegate.countEvents(filter)).thenReturn(1L);
 
-		assertThat(this.decorator.findEvents(0, 10, targetUserId)).containsExactly(EVENT);
-		assertThat(this.decorator.countEvents(targetUserId)).isEqualTo(1L);
+		assertThat(this.decorator.findEvents(0, 10, filter)).containsExactly(EVENT);
+		assertThat(this.decorator.countEvents(filter)).isEqualTo(1L);
+	}
+
+	@Test
+	void delegatesListDistinctActorEmailsUnchanged() {
+		when(this.delegate.listDistinctActorEmails()).thenReturn(List.of("luffy@onepiece.local"));
+
+		assertThat(this.decorator.listDistinctActorEmails()).containsExactly("luffy@onepiece.local");
 	}
 
 }

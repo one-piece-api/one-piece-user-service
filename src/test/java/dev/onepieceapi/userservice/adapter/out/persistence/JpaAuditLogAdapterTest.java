@@ -2,6 +2,7 @@ package dev.onepieceapi.userservice.adapter.out.persistence;
 
 import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
+import dev.onepieceapi.userservice.domain.AuditLogFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +16,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,17 +92,18 @@ class JpaAuditLogAdapterTest {
 	}
 
 	@Test
-	void findsEveryEventNewestFirstWhenNoUserIsGiven() {
+	void findsEveryEventNewestFirstWhenNoFilterIsGiven() {
 		var actorId = UUID.randomUUID();
 		var targetId = UUID.randomUUID();
 		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T10:00:00Z")));
 		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T11:00:00Z")));
 
-		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, null);
+		var filter = AuditLogFilter.of(null, null, null, null, null);
+		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, filter);
 
 		assertThat(events).extracting(AuditEvent::occurredAt)
 			.containsExactly(Instant.parse("2026-08-23T11:00:00Z"), Instant.parse("2026-08-23T10:00:00Z"));
-		assertThat(this.jpaAuditLogAdapter.countEvents(null)).isEqualTo(2);
+		assertThat(this.jpaAuditLogAdapter.countEvents(filter)).isEqualTo(2);
 	}
 
 	@Test
@@ -110,10 +114,75 @@ class JpaAuditLogAdapterTest {
 		this.jpaAuditLogAdapter.record(eventAt(actorId, luffyId, Instant.parse("2026-08-23T10:00:00Z")));
 		this.jpaAuditLogAdapter.record(eventAt(actorId, namiId, Instant.parse("2026-08-23T11:00:00Z")));
 
-		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, luffyId);
+		var filter = AuditLogFilter.forTargetUser(luffyId);
+		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, filter);
 
 		assertThat(events).extracting(AuditEvent::targetUserId).containsExactly(luffyId);
-		assertThat(this.jpaAuditLogAdapter.countEvents(luffyId)).isEqualTo(1);
+		assertThat(this.jpaAuditLogAdapter.countEvents(filter)).isEqualTo(1);
+	}
+
+	@Test
+	void findsOnlyEventsMatchingOneOfTheGivenActions() {
+		var actorId = UUID.randomUUID();
+		var targetId = UUID.randomUUID();
+		this.jpaAuditLogAdapter
+			.record(new AuditEvent(AuditAction.ROLE_ASSIGNED, actorId, "luffy@onepiece.local", targetId,
+					"usopp@onepiece.local", "NAVIGATOR", Instant.parse("2026-08-23T10:00:00Z")));
+		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T11:00:00Z")));
+
+		var filter = AuditLogFilter.of(null, Set.of(AuditAction.ROLE_ASSIGNED), null, null, null);
+		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, filter);
+
+		assertThat(events).extracting(AuditEvent::action).containsExactly(AuditAction.ROLE_ASSIGNED);
+		assertThat(this.jpaAuditLogAdapter.countEvents(filter)).isEqualTo(1);
+	}
+
+	@Test
+	void findsOnlyEventsFromTheGivenActor() {
+		var actorId = UUID.randomUUID();
+		var targetId = UUID.randomUUID();
+		this.jpaAuditLogAdapter.record(new AuditEvent(AuditAction.USER_INVITED, actorId, "luffy@onepiece.local",
+				targetId, "usopp@onepiece.local", null, Instant.parse("2026-08-23T10:00:00Z")));
+		this.jpaAuditLogAdapter.record(new AuditEvent(AuditAction.USER_INVITED, actorId, "nami@onepiece.local",
+				targetId, "usopp@onepiece.local", null, Instant.parse("2026-08-23T11:00:00Z")));
+
+		var filter = AuditLogFilter.of(null, null, "nami@onepiece.local", null, null);
+		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, filter);
+
+		assertThat(events).extracting(AuditEvent::actorEmail).containsExactly("nami@onepiece.local");
+		assertThat(this.jpaAuditLogAdapter.countEvents(filter)).isEqualTo(1);
+	}
+
+	@Test
+	void findsOnlyEventsWithinTheGivenDateRangeInclusiveOfBothEnds() {
+		var actorId = UUID.randomUUID();
+		var targetId = UUID.randomUUID();
+		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-22T23:59:59Z")));
+		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T10:00:00Z")));
+		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-24T23:59:59Z")));
+		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-25T00:00:00Z")));
+
+		var filter = AuditLogFilter.of(null, null, null, LocalDate.of(2026, 8, 23), LocalDate.of(2026, 8, 24));
+		List<AuditEvent> events = this.jpaAuditLogAdapter.findEvents(0, 10, filter);
+
+		assertThat(events).extracting(AuditEvent::occurredAt)
+			.containsExactlyInAnyOrder(Instant.parse("2026-08-23T10:00:00Z"), Instant.parse("2026-08-24T23:59:59Z"));
+		assertThat(this.jpaAuditLogAdapter.countEvents(filter)).isEqualTo(2);
+	}
+
+	@Test
+	void listsEveryDistinctActorSortedAlphabetically() {
+		var actorId = UUID.randomUUID();
+		var targetId = UUID.randomUUID();
+		this.jpaAuditLogAdapter.record(new AuditEvent(AuditAction.USER_INVITED, actorId, "zoro@onepiece.local",
+				targetId, "usopp@onepiece.local", null, Instant.parse("2026-08-23T10:00:00Z")));
+		this.jpaAuditLogAdapter.record(new AuditEvent(AuditAction.USER_INVITED, actorId, "luffy@onepiece.local",
+				targetId, "usopp@onepiece.local", null, Instant.parse("2026-08-23T11:00:00Z")));
+		this.jpaAuditLogAdapter.record(new AuditEvent(AuditAction.USER_INVITED, actorId, "luffy@onepiece.local",
+				targetId, "usopp@onepiece.local", null, Instant.parse("2026-08-23T12:00:00Z")));
+
+		assertThat(this.jpaAuditLogAdapter.listDistinctActorEmails()).containsExactly("luffy@onepiece.local",
+				"zoro@onepiece.local");
 	}
 
 	private static AuditEvent eventAt(UUID actorId, UUID targetId, Instant occurredAt) {

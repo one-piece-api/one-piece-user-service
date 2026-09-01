@@ -38,6 +38,8 @@ public final class ApiPaths {
 
 	public static final String AUDIT = "/audit";
 
+	public static final String AUDIT_ACTORS = "/audit/actors";
+
 	private ApiPaths() {
 	}
 
