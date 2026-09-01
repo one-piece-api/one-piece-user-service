@@ -70,6 +70,11 @@ public class RoleManagementService {
 		this.auditLogPort.record(AuditEventMapper.permissionRevokedFromRole(actor, role, permissionKey, now));
 	}
 
+	public void deletePermission(String key, User actor) {
+		this.roleDirectoryPort.deletePermission(key);
+		this.auditLogPort.record(AuditEventMapper.permissionDeleted(actor, key, Instant.now(this.clock)));
+	}
+
 	private static String normalize(String name) {
 		String normalized = name.trim()
 			.toUpperCase(Locale.ROOT)

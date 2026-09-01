@@ -3,6 +3,7 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.application.exception.LastRoleManagerException;
 import dev.onepieceapi.userservice.application.exception.PermissionAlreadyExistsException;
+import dev.onepieceapi.userservice.application.exception.PermissionInUseException;
 import dev.onepieceapi.userservice.application.exception.PermissionNotFoundException;
 import dev.onepieceapi.userservice.application.exception.RoleAlreadyExistsException;
 import dev.onepieceapi.userservice.application.exception.RoleInUseException;
@@ -307,6 +308,43 @@ class KeycloakRoleDirectoryAdapterTest {
 
 		assertThatThrownBy(() -> this.adapter.revokePermission("ADMIN", "roles:manage"))
 			.isInstanceOf(LastRoleManagerException.class);
+		verify(roleResource, never()).deleteComposites(any());
+	}
+
+	@Test
+	void deletesAPermissionHeldByNoRole() {
+		mockRealmRoleNames("ADMIN");
+		mockComposites("ADMIN");
+		var permissionResource = mock(RoleResource.class);
+		when(this.permissionRoles.get("docs:approve")).thenReturn(permissionResource);
+		when(permissionResource.toRepresentation()).thenReturn(clientRole("docs:approve"));
+
+		this.adapter.deletePermission("docs:approve");
+
+		verify(permissionResource).remove();
+	}
+
+	@Test
+	void rejectsDeletingAPermissionThatDoesNotExist() {
+		var permissionResource = mock(RoleResource.class);
+		when(this.permissionRoles.get("ghost:key")).thenReturn(permissionResource);
+		when(permissionResource.toRepresentation()).thenThrow(new NotFoundException());
+
+		assertThatThrownBy(() -> this.adapter.deletePermission("ghost:key"))
+			.isInstanceOf(PermissionNotFoundException.class);
+	}
+
+	@Test
+	void rejectsDeletingAPermissionStillHeldByARole() {
+		mockRealmRoleNames("ADMIN");
+		var roleResource = mockComposites("ADMIN", clientRole("docs:approve"));
+		var permissionResource = mock(RoleResource.class);
+		when(this.permissionRoles.get("docs:approve")).thenReturn(permissionResource);
+		when(permissionResource.toRepresentation()).thenReturn(clientRole("docs:approve"));
+
+		assertThatThrownBy(() -> this.adapter.deletePermission("docs:approve"))
+			.isInstanceOf(PermissionInUseException.class);
+		verify(permissionResource, never()).remove();
 		verify(roleResource, never()).deleteComposites(any());
 	}
 

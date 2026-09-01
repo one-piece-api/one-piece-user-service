@@ -2,6 +2,7 @@ package dev.onepieceapi.userservice.application.port.out;
 
 import dev.onepieceapi.userservice.application.exception.LastRoleManagerException;
 import dev.onepieceapi.userservice.application.exception.PermissionAlreadyExistsException;
+import dev.onepieceapi.userservice.application.exception.PermissionInUseException;
 import dev.onepieceapi.userservice.application.exception.PermissionNotFoundException;
 import dev.onepieceapi.userservice.application.exception.RoleAlreadyExistsException;
 import dev.onepieceapi.userservice.application.exception.RoleInUseException;
@@ -77,5 +78,13 @@ public interface RoleDirectoryPort {
 	 * {@code role} is the only one that currently holds it
 	 */
 	void revokePermission(String role, String permissionKey);
+
+	/**
+	 * @throws PermissionNotFoundException if no permission named {@code key} exists
+	 * @throws PermissionInUseException if any role currently holds {@code key} - it must
+	 * be revoked from every role first, the same explicit-before-destructive shape
+	 * {@link #deleteRole} already gives an in-use role
+	 */
+	void deletePermission(String key);
 
 }

@@ -560,6 +560,53 @@ class IdentityAndRoleCatalogIntegrationTest {
 				.contains("\"errorCode\":\"USER_PERMISSION_ALREADY_EXISTS\""));
 	}
 
+	@Test
+	void anAdminCanCreateAndDeleteAPermission() {
+		String adminToken = tokenFor("luffy", "luffy-pass");
+
+		this.restTestClient.post()
+			.uri("/permissions")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("""
+					{"key": "docs:archive", "description": "Archive documents"}
+					""")
+			.exchange()
+			.expectStatus()
+			.isCreated();
+
+		this.restTestClient.delete()
+			.uri("/permissions/docs:archive")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + adminToken)
+			.exchange()
+			.expectStatus()
+			.isNoContent();
+	}
+
+	@Test
+	void deletingAPermissionStillAssignedToARoleIsRejected() {
+		String body = this.restTestClient.delete()
+			.uri("/permissions/roles:manage")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("luffy", "luffy-pass"))
+			.exchange()
+			.expectStatus()
+			.isEqualTo(409)
+			.expectBody(String.class)
+			.returnResult()
+			.getResponseBody();
+		assertThat(body).contains("\"errorCode\":\"USER_PERMISSION_IN_USE\"");
+	}
+
+	@Test
+	void aNonAdminCannotDeleteAPermission() {
+		this.restTestClient.delete()
+			.uri("/permissions/users:read")
+			.header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor("nami", "nami-pass"))
+			.exchange()
+			.expectStatus()
+			.isForbidden();
+	}
+
 	/**
 	 * The fixture realm's ADMIN role is the only one holding {@code roles:manage} -
 	 * rejecting this leaves that invariant intact for every other test in this class.

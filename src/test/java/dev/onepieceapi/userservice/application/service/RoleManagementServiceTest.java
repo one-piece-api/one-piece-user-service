@@ -133,4 +133,13 @@ class RoleManagementServiceTest {
 		assertThat(action).isEqualTo(AuditAction.PERMISSION_REVOKED_FROM_ROLE);
 	}
 
+	@Test
+	void deletesAPermissionAndRecordsWhoDidIt() {
+		this.roleManagementService.deletePermission("docs:approve", ADMIN);
+
+		verify(this.roleDirectoryPort).deletePermission("docs:approve");
+		verify(this.auditLogPort).record(this.auditEventCaptor.capture());
+		assertThat(this.auditEventCaptor.getValue().action()).isEqualTo(AuditAction.PERMISSION_DELETED);
+	}
+
 }

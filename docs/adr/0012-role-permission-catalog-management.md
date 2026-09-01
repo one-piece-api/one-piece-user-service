@@ -43,14 +43,17 @@ except listing, which stays on the existing `roles:read`:
 | DELETE | `/roles/{role}` | `roles:manage` | delete a role |
 | GET | `/permissions` | `roles:manage` | list every permission, including unassigned |
 | POST | `/permissions` | `roles:manage` | create a permission |
+| DELETE | `/permissions/{permission}` | `roles:manage` | delete a permission |
 | PUT/DELETE | `/roles/{role}/permissions/{permission}` | `roles:manage` | assign/revoke |
 
-**Two "don't lock everyone out" guards**, colocated with `KeycloakRoleDirectoryAdapter`
-(the adapter that can cheaply query for them) rather than pushed up to the service —
-the same precedent `KeycloakUserDirectoryAdapter#hasAnotherAdmin` already set: deleting
-a role with members, or deleting/revoking `roles:manage` from the only role that holds
-it, is rejected (`RoleInUseException`/`LastRoleManagerException`, both 409) rather than
-silently leaving the catalog unmanageable.
+**Three "don't lock everyone out"/"don't silently break things" guards**, colocated
+with `KeycloakRoleDirectoryAdapter` (the adapter that can cheaply query for them) rather
+than pushed up to the service — the same precedent `KeycloakUserDirectoryAdapter#hasAnotherAdmin`
+already set: deleting a role with members, deleting a permission still held by at least
+one role, or deleting/revoking `roles:manage` from the only role that holds it, are all
+rejected (`RoleInUseException`/`PermissionInUseException`/`LastRoleManagerException`, all
+409) rather than silently leaving the catalog unmanageable or roles missing a permission
+their operator didn't mean to revoke.
 
 **The Keycloak service account (`user-service-admin`) is granted `manage-realm`,
 `manage-clients`, `view-clients`, and `query-clients`** (all `realm-management` client

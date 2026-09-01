@@ -3,6 +3,7 @@ package dev.onepieceapi.userservice.adapter.out.keycloak;
 import dev.onepieceapi.userservice.adapter.out.keycloak.config.KeycloakAdminProperties;
 import dev.onepieceapi.userservice.application.exception.LastRoleManagerException;
 import dev.onepieceapi.userservice.application.exception.PermissionAlreadyExistsException;
+import dev.onepieceapi.userservice.application.exception.PermissionInUseException;
 import dev.onepieceapi.userservice.application.exception.PermissionNotFoundException;
 import dev.onepieceapi.userservice.application.exception.RoleAlreadyExistsException;
 import dev.onepieceapi.userservice.application.exception.RoleInUseException;
@@ -195,6 +196,22 @@ public class KeycloakRoleDirectoryAdapter implements RoleDirectoryPort {
 		catch (RuntimeException ex) {
 			String message = "Failed to revoke " + permissionKey + " from role " + role;
 			throw new KeycloakCommunicationException(message, ex);
+		}
+	}
+
+	@Override
+	public void deletePermission(String key) {
+		requirePermissionRepresentation(key);
+		RolesResource realmRoles = getRealm().roles();
+		if (!rolesWithPermission(realmRoles, key).isEmpty()) {
+			throw new PermissionInUseException(key);
+		}
+
+		try {
+			permissionsClientRoles().get(key).remove();
+		}
+		catch (RuntimeException ex) {
+			throw new KeycloakCommunicationException("Failed to delete permission " + key, ex);
 		}
 	}
 

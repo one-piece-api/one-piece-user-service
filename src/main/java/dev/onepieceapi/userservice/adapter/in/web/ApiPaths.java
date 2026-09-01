@@ -26,6 +26,8 @@ public final class ApiPaths {
 
 	public static final String PERMISSIONS = "/permissions";
 
+	public static final String PERMISSION_BY_KEY = "/permissions/{permission}";
+
 	public static final String USER_RESEND_INVITATION = "/users/{userId}/resend-invitation";
 
 	public static final String USER_ROLE = "/users/{userId}/roles/{role}";

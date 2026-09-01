@@ -5,6 +5,7 @@ import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthen
 import dev.onepieceapi.userservice.adapter.in.web.security.SecurityConfig;
 import dev.onepieceapi.userservice.application.exception.LastRoleManagerException;
 import dev.onepieceapi.userservice.application.exception.PermissionAlreadyExistsException;
+import dev.onepieceapi.userservice.application.exception.PermissionInUseException;
 import dev.onepieceapi.userservice.application.exception.RoleAlreadyExistsException;
 import dev.onepieceapi.userservice.application.exception.RoleInUseException;
 import dev.onepieceapi.userservice.application.service.RoleManagementService;
@@ -196,6 +197,29 @@ class RoleControllerTest {
 		this.mockMvc.perform(request)
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.errorCode").value("USER_PERMISSION_ALREADY_EXISTS"));
+	}
+
+	@Test
+	void aCallerWithRolesManageCanDeleteAPermission() throws Exception {
+		var request = delete("/permissions/docs:approve").with(authorities("PERMISSION_roles:manage"));
+		this.mockMvc.perform(request).andExpect(status().isNoContent());
+	}
+
+	@Test
+	void deletingAnInUsePermissionReturnsConflict() throws Exception {
+		var inUse = new PermissionInUseException("docs:approve");
+		doThrow(inUse).when(this.roleManagementService).deletePermission("docs:approve", luffy());
+
+		var request = delete("/permissions/docs:approve").with(authorities("PERMISSION_roles:manage"));
+		this.mockMvc.perform(request)
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.errorCode").value("USER_PERMISSION_IN_USE"));
+	}
+
+	@Test
+	void aCallerWithoutRolesManageCannotDeleteAPermission() throws Exception {
+		var request = delete("/permissions/docs:approve").with(authorities(NO_RELEVANT_PERMISSION));
+		this.mockMvc.perform(request).andExpect(status().isForbidden());
 	}
 
 	@Test

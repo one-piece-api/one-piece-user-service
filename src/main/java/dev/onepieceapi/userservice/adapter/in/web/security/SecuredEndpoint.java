@@ -30,6 +30,7 @@ enum SecuredEndpoint {
 	ROLE_DELETE(HttpMethod.DELETE, ApiPaths.ROLE_BY_NAME, permission(Permission.ROLES_MANAGE)),
 	PERMISSIONS_LIST(HttpMethod.GET, ApiPaths.PERMISSIONS, permission(Permission.ROLES_MANAGE)),
 	PERMISSION_CREATE(HttpMethod.POST, ApiPaths.PERMISSIONS, permission(Permission.ROLES_MANAGE)),
+	PERMISSION_DELETE(HttpMethod.DELETE, ApiPaths.PERMISSION_BY_KEY, permission(Permission.ROLES_MANAGE)),
 	ROLE_PERMISSION_ASSIGN(HttpMethod.PUT, ApiPaths.ROLE_PERMISSION, permission(Permission.ROLES_MANAGE)),
 	ROLE_PERMISSION_REVOKE(HttpMethod.DELETE, ApiPaths.ROLE_PERMISSION, permission(Permission.ROLES_MANAGE)),
 	USER_INVITE(HttpMethod.POST, ApiPaths.USERS, permission(Permission.USERS_INVITE)),

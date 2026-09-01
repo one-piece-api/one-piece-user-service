@@ -79,6 +79,12 @@ class RoleController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(response);
 	}
 
+	@DeleteMapping(ApiPaths.PERMISSION_BY_KEY)
+	ResponseEntity<Void> deletePermission(@PathVariable String permission, @AuthenticationPrincipal User user) {
+		this.roleManagementService.deletePermission(permission, user);
+		return ResponseEntity.noContent().build();
+	}
+
 	@PutMapping(ApiPaths.ROLE_PERMISSION)
 	ResponseEntity<Void> assignPermission(@PathVariable String role, @PathVariable String permission,
 			@AuthenticationPrincipal User user) {
