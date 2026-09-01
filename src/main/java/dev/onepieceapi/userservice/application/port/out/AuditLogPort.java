@@ -21,7 +21,10 @@ public interface AuditLogPort {
 
 	long countEvents(AuditLogFilter filter);
 
-	/** Every actor who has ever recorded an event, sorted, for the Ship's Log author filter. */
+	/**
+	 * Every actor who has ever recorded an event, sorted, for the Ship's Log author
+	 * filter.
+	 */
 	List<String> listDistinctActorEmails();
 
 }

@@ -33,15 +33,17 @@ class AuditController {
 
 	@GetMapping(ApiPaths.AUDIT)
 	PageResponse<AuditEventResponse> list(Pageable pageable, @RequestParam(required = false) UUID userId,
-			@RequestParam(required = false) Set<AuditAction> actions,
-			@RequestParam(required = false) String actorEmail,
+			@RequestParam(required = false) Set<AuditAction> actions, @RequestParam(required = false) String actorEmail,
 			@RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
 		Page<AuditEventResponse> page = this.auditQueryService.list(pageable, userId, actions, actorEmail, from, to)
 			.map(AuditEventResponseMapper::toResponse);
 		return PageResponse.from(page);
 	}
 
-	/** Every actor who has ever recorded an event, sorted - powers the Ship's Log author filter. */
+	/**
+	 * Every actor who has ever recorded an event, sorted - powers the Ship's Log author
+	 * filter.
+	 */
 	@GetMapping(ApiPaths.AUDIT_ACTORS)
 	List<String> listActors() {
 		return this.auditQueryService.listActors();

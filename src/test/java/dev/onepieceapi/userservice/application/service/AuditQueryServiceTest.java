@@ -90,8 +90,7 @@ class AuditQueryServiceTest {
 		when(this.auditLogPort.findEvents(0, 20, filter)).thenReturn(List.of(event));
 		when(this.auditLogPort.countEvents(filter)).thenReturn(1L);
 
-		Page<AuditEvent> page = this.auditQueryService.list(pageable, null, actions, "luffy@onepiece.local", from,
-				to);
+		Page<AuditEvent> page = this.auditQueryService.list(pageable, null, actions, "luffy@onepiece.local", from, to);
 
 		assertThat(page.getContent()).containsExactly(event);
 	}
@@ -101,8 +100,7 @@ class AuditQueryServiceTest {
 		when(this.auditLogPort.listDistinctActorEmails())
 			.thenReturn(List.of("luffy@onepiece.local", "nami@onepiece.local"));
 
-		assertThat(this.auditQueryService.listActors()).containsExactly("luffy@onepiece.local",
-				"nami@onepiece.local");
+		assertThat(this.auditQueryService.listActors()).containsExactly("luffy@onepiece.local", "nami@onepiece.local");
 	}
 
 	private static AuditEvent anEvent() {

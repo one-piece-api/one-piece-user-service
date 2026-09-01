@@ -125,9 +125,8 @@ class JpaAuditLogAdapterTest {
 	void findsOnlyEventsMatchingOneOfTheGivenActions() {
 		var actorId = UUID.randomUUID();
 		var targetId = UUID.randomUUID();
-		this.jpaAuditLogAdapter
-			.record(new AuditEvent(AuditAction.ROLE_ASSIGNED, actorId, "luffy@onepiece.local", targetId,
-					"usopp@onepiece.local", "NAVIGATOR", Instant.parse("2026-08-23T10:00:00Z")));
+		this.jpaAuditLogAdapter.record(new AuditEvent(AuditAction.ROLE_ASSIGNED, actorId, "luffy@onepiece.local",
+				targetId, "usopp@onepiece.local", "NAVIGATOR", Instant.parse("2026-08-23T10:00:00Z")));
 		this.jpaAuditLogAdapter.record(eventAt(actorId, targetId, Instant.parse("2026-08-23T11:00:00Z")));
 
 		var filter = AuditLogFilter.of(null, Set.of(AuditAction.ROLE_ASSIGNED), null, null, null);

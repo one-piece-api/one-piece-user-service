@@ -39,7 +39,10 @@ public class AuditQueryService {
 		return new PageImpl<>(content, pageable, this.auditLogPort.countEvents(filter));
 	}
 
-	/** Every actor who has ever recorded an event, sorted - powers the author filter dropdown. */
+	/**
+	 * Every actor who has ever recorded an event, sorted - powers the author filter
+	 * dropdown.
+	 */
 	public List<String> listActors() {
 		return this.auditLogPort.listDistinctActorEmails();
 	}
