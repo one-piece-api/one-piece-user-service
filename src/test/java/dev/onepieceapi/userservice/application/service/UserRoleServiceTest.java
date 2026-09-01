@@ -80,6 +80,7 @@ class UserRoleServiceTest {
 		assertThat(event.action()).isEqualTo(AuditAction.ROLE_ASSIGNED);
 		assertThat(event.actorUserId()).isEqualTo(ADMIN.userId());
 		assertThat(event.targetUserId()).isEqualTo(TARGET_ID);
+		assertThat(event.targetLabel()).isEqualTo("ADMIN");
 		assertThat(event.occurredAt()).isEqualTo(NOW);
 	}
 
@@ -97,6 +98,7 @@ class UserRoleServiceTest {
 		assertThat(event.action()).isEqualTo(AuditAction.ROLE_REVOKED);
 		assertThat(event.actorUserId()).isEqualTo(ADMIN.userId());
 		assertThat(event.targetUserId()).isEqualTo(TARGET_ID);
+		assertThat(event.targetLabel()).isEqualTo("ADMIN");
 		assertThat(event.occurredAt()).isEqualTo(NOW);
 	}
 

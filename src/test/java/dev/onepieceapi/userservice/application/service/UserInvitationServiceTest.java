@@ -88,7 +88,24 @@ class UserInvitationServiceTest {
 		assertThat(event.actorEmail()).isEqualTo(ADMIN.email());
 		assertThat(event.targetUserId()).isEqualTo(INVITED_ID);
 		assertThat(event.targetEmail()).isEqualTo(INVITED_EMAIL);
+		assertThat(event.targetLabel()).isEqualTo("EDITOR");
 		assertThat(event.occurredAt()).isEqualTo(NOW);
+	}
+
+	@Test
+	void joinsMultipleInvitedRolesIntoTheAuditTrailLabel() {
+		var roleCatalog = Map.of("ADMIN", List.<String>of(), "EDITOR", List.<String>of(), "REVIEWER",
+				List.<String>of());
+		when(this.roleDirectoryPort.listRoles()).thenReturn(roleCatalog);
+		Set<String> roles = Set.of("EDITOR", "REVIEWER");
+		var invited = new User(INVITED_ID, INVITED_EMAIL, INVITED_EMAIL, AccountStatus.PENDING,
+				List.of("EDITOR", "REVIEWER"), NOW);
+		when(this.userDirectoryPort.inviteUser(INVITED_EMAIL, roles)).thenReturn(invited);
+
+		this.userInvitationService.invite(INVITED_EMAIL, roles, ADMIN);
+
+		verify(this.auditLogPort).record(this.auditEventCaptor.capture());
+		assertThat(this.auditEventCaptor.getValue().targetLabel()).isEqualTo("EDITOR, REVIEWER");
 	}
 
 	@Test

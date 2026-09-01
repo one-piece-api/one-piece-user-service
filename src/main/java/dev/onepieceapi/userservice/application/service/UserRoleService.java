@@ -34,14 +34,14 @@ public class UserRoleService {
 	public User assignRole(UUID userId, String role, User actor) {
 		requireRoleExists(role);
 		User updated = this.userDirectoryPort.assignRole(userId, role);
-		this.auditLogPort.record(AuditEventMapper.roleAssigned(actor, updated, Instant.now(this.clock)));
+		this.auditLogPort.record(AuditEventMapper.roleAssigned(actor, updated, role, Instant.now(this.clock)));
 		return updated;
 	}
 
 	public User revokeRole(UUID userId, String role, User actor) {
 		requireRoleExists(role);
 		User updated = this.userDirectoryPort.revokeRole(userId, role);
-		this.auditLogPort.record(AuditEventMapper.roleRevoked(actor, updated, Instant.now(this.clock)));
+		this.auditLogPort.record(AuditEventMapper.roleRevoked(actor, updated, role, Instant.now(this.clock)));
 		return updated;
 	}
 
