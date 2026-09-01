@@ -28,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -57,9 +56,9 @@ class UserController {
 	 * {@code UserDirectoryPort#findUsers} for how a non-empty filter is resolved.
 	 */
 	@GetMapping(ApiPaths.USERS)
-	PageResponse<UserSummaryResponse> listUsers(Pageable pageable, @RequestParam Optional<String> q,
-			@RequestParam Optional<String> role, @RequestParam Optional<AccountStatus> status) {
-		var filter = new UserFilter(q.orElse(null), role.orElse(null), status.orElse(null));
+	PageResponse<UserSummaryResponse> listUsers(Pageable pageable, @RequestParam(required = false) String q,
+			@RequestParam(required = false) String role, @RequestParam(required = false) AccountStatus status) {
+		var filter = new UserFilter(q, role, status);
 		Page<UserSummaryResponse> page = this.userQueryService.list(pageable, filter)
 			.map(UserSummaryResponseMapper::toResponse);
 		return PageResponse.from(page);
