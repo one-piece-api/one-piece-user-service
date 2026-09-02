@@ -9,6 +9,7 @@ import dev.onepieceapi.userservice.application.exception.LastAdministratorExcept
 import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.UserDirectoryPort;
+import dev.onepieceapi.userservice.config.KeycloakRoleProperties;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
@@ -92,6 +93,8 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 	private final ExecutorService keycloakAdminExecutor;
 
 	private final KeycloakAdminProperties keycloakAdminProperties;
+
+	private final KeycloakRoleProperties keycloakRoleProperties;
 
 	private final KeycloakInvitationProperties keycloakInvitationProperties;
 
@@ -215,7 +218,7 @@ public class KeycloakUserDirectoryAdapter implements UserDirectoryPort {
 			.listAll()
 			.stream()
 			.map(RoleRepresentation::getName)
-			.filter(name -> !this.keycloakAdminProperties.excludedRealmRoles().contains(name))
+			.filter(name -> !this.keycloakRoleProperties.excludedRealmRoles().contains(name))
 			.toList();
 	}
 

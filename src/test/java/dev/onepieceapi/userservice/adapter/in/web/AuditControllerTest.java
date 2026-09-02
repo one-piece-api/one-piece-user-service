@@ -4,6 +4,7 @@ import dev.onepieceapi.exception.web.ApplicationExceptionHandler;
 import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthenticationToken;
 import dev.onepieceapi.userservice.adapter.in.web.security.SecurityConfig;
 import dev.onepieceapi.userservice.application.service.AuditQueryService;
+import dev.onepieceapi.userservice.config.KeycloakRoleConfig;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
@@ -38,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * equivalent coverage of the other permission-gated endpoints.
  */
 @WebMvcTest(AuditController.class)
-@Import({ SecurityConfig.class, ApplicationExceptionHandler.class })
+@Import({ SecurityConfig.class, ApplicationExceptionHandler.class, KeycloakRoleConfig.class })
 class AuditControllerTest {
 
 	@Autowired

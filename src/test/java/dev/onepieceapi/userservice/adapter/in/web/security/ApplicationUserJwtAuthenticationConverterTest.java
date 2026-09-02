@@ -1,5 +1,6 @@
 package dev.onepieceapi.userservice.adapter.in.web.security;
 
+import dev.onepieceapi.userservice.config.KeycloakRoleProperties;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +31,8 @@ class ApplicationUserJwtAuthenticationConverterTest {
 
 	@BeforeEach
 	void setUp() {
-		this.converter = new ApplicationUserJwtAuthenticationConverter();
+		var roleProperties = new KeycloakRoleProperties(Set.of("default-roles-onepiece"));
+		this.converter = new ApplicationUserJwtAuthenticationConverter(roleProperties);
 	}
 
 	@Test
@@ -41,6 +44,18 @@ class ApplicationUserJwtAuthenticationConverterTest {
 			.containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_EDITOR");
 		var roles = List.of("ADMIN", "EDITOR");
 		var expected = new User(USER_ID, USERNAME, EMAIL, AccountStatus.ACTIVE, roles, null);
+		assertThat(((ApplicationUserAuthenticationToken) authentication).getUser()).isEqualTo(expected);
+	}
+
+	@Test
+	void filtersOutExcludedRealmRolesLikeKeycloaksOwnDefaultRolesComposite() {
+		Jwt jwt = jwtWithSubjectUsernameEmailAndRoles(USER_ID, USERNAME, EMAIL, "ADMIN", "default-roles-onepiece");
+
+		var authentication = this.converter.convert(jwt);
+
+		assertThat(authentication.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+			.containsExactly("ROLE_ADMIN");
+		var expected = new User(USER_ID, USERNAME, EMAIL, AccountStatus.ACTIVE, List.of("ADMIN"), null);
 		assertThat(((ApplicationUserAuthenticationToken) authentication).getUser()).isEqualTo(expected);
 	}
 

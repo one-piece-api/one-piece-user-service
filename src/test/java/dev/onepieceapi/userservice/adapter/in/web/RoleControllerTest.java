@@ -10,6 +10,7 @@ import dev.onepieceapi.userservice.application.exception.RoleAlreadyExistsExcept
 import dev.onepieceapi.userservice.application.exception.RoleInUseException;
 import dev.onepieceapi.userservice.application.service.RoleManagementService;
 import dev.onepieceapi.userservice.application.service.RoleQueryService;
+import dev.onepieceapi.userservice.config.KeycloakRoleConfig;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.PermissionDefinition;
 import dev.onepieceapi.userservice.domain.User;
@@ -47,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * exercises each endpoint's {@code SecuredEndpoint} permission rule itself.
  */
 @WebMvcTest(RoleController.class)
-@Import({ SecurityConfig.class, ApplicationExceptionHandler.class })
+@Import({ SecurityConfig.class, ApplicationExceptionHandler.class, KeycloakRoleConfig.class })
 class RoleControllerTest {
 
 	private static final String NO_RELEVANT_PERMISSION = "PERMISSION_docs:read";

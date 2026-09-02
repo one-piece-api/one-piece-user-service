@@ -8,6 +8,7 @@ import dev.onepieceapi.userservice.application.exception.InvitationNotResendable
 import dev.onepieceapi.userservice.application.exception.LastAdministratorException;
 import dev.onepieceapi.userservice.application.exception.LastRoleException;
 import dev.onepieceapi.userservice.application.exception.UserNotFoundException;
+import dev.onepieceapi.userservice.config.KeycloakRoleProperties;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
@@ -94,14 +95,14 @@ class KeycloakUserDirectoryAdapterTest {
 	@BeforeEach
 	void setUp() {
 		String clientId = "user-service-admin";
-		var adminProperties = new KeycloakAdminProperties("http://keycloak", "onepiece", clientId, "secret",
-				Set.of("default-roles-onepiece"));
+		var adminProperties = new KeycloakAdminProperties("http://keycloak", "onepiece", clientId, "secret");
+		var roleProperties = new KeycloakRoleProperties(Set.of("default-roles-onepiece"));
 		var invitationProperties = new KeycloakInvitationProperties("onepiece-proxy", "http://localhost:4180/",
 				Duration.ofHours(12));
 		ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		this.keycloakUserDirectoryAdapter = new KeycloakUserDirectoryAdapter(this.keycloakAdminClient, executor,
-				adminProperties, invitationProperties, clock);
+				adminProperties, roleProperties, invitationProperties, clock);
 
 		lenient().when(this.keycloakAdminClient.realm("onepiece")).thenReturn(this.realmResource);
 		lenient().when(this.realmResource.users()).thenReturn(this.usersResource);

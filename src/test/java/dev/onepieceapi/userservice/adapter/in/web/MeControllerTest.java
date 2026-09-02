@@ -1,11 +1,13 @@
 package dev.onepieceapi.userservice.adapter.in.web;
 
 import dev.onepieceapi.userservice.adapter.in.web.security.ApplicationUserAuthenticationToken;
+import dev.onepieceapi.userservice.config.KeycloakRoleConfig;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MeController.class)
+@Import(KeycloakRoleConfig.class)
 class MeControllerTest {
 
 	@Autowired

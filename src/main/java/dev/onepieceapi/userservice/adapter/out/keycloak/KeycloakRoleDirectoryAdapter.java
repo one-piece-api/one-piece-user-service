@@ -9,6 +9,7 @@ import dev.onepieceapi.userservice.application.exception.RoleAlreadyExistsExcept
 import dev.onepieceapi.userservice.application.exception.RoleInUseException;
 import dev.onepieceapi.userservice.application.exception.RoleNotFoundException;
 import dev.onepieceapi.userservice.application.port.out.RoleDirectoryPort;
+import dev.onepieceapi.userservice.config.KeycloakRoleProperties;
 import dev.onepieceapi.userservice.domain.PermissionDefinition;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
@@ -57,6 +58,8 @@ public class KeycloakRoleDirectoryAdapter implements RoleDirectoryPort {
 	private final Keycloak keycloakAdminClient;
 
 	private final KeycloakAdminProperties keycloakAdminProperties;
+
+	private final KeycloakRoleProperties keycloakRoleProperties;
 
 	@Override
 	public Map<String, List<String>> listRoles() {
@@ -219,7 +222,7 @@ public class KeycloakRoleDirectoryAdapter implements RoleDirectoryPort {
 		return realmRoles.list()
 			.stream()
 			.map(RoleRepresentation::getName)
-			.filter(name -> !this.keycloakAdminProperties.excludedRealmRoles().contains(name));
+			.filter(name -> !this.keycloakRoleProperties.excludedRealmRoles().contains(name));
 	}
 
 	private List<String> rolesWithPermission(RolesResource realmRoles, String permissionKey) {

@@ -12,6 +12,7 @@ import dev.onepieceapi.userservice.application.service.UserAccessService;
 import dev.onepieceapi.userservice.application.service.UserInvitationService;
 import dev.onepieceapi.userservice.application.service.UserQueryService;
 import dev.onepieceapi.userservice.application.service.UserRoleService;
+import dev.onepieceapi.userservice.config.KeycloakRoleConfig;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
@@ -60,7 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code @SpringBootTest} context, which loads it automatically).
  */
 @WebMvcTest(UserController.class)
-@Import({ SecurityConfig.class, ApplicationExceptionHandler.class })
+@Import({ SecurityConfig.class, ApplicationExceptionHandler.class, KeycloakRoleConfig.class })
 class UserControllerTest {
 
 	private static final String NO_RELEVANT_PERMISSION = "PERMISSION_docs:read";

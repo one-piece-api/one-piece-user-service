@@ -24,7 +24,7 @@ public interface RoleDirectoryPort {
 	/**
 	 * Every realm role this application manages (Keycloak built-ins such as
 	 * {@code default-roles-<realm>} are excluded, see
-	 * {@code KeycloakAdminProperties#excludedRealmRoles}) and the permission keys each
+	 * {@code KeycloakRoleProperties#excludedRealmRoles}) and the permission keys each
 	 * currently bundles as Keycloak composite client-roles - see
 	 * {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}.
 	 */

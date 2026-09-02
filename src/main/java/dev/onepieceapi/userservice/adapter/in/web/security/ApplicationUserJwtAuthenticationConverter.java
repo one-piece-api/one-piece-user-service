@@ -1,7 +1,10 @@
 package dev.onepieceapi.userservice.adapter.in.web.security;
 
+import dev.onepieceapi.userservice.config.KeycloakRoleProperties;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.User;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -37,9 +40,12 @@ import java.util.stream.Stream;
  * Roles are read from the token's own {@code realm_access.roles} claim: Keycloak
  * recomputes that claim on every token issuance, including the silent refresh
  * oauth2-proxy already performs, so a role change (UF-IDU-15) reaches authorization on
- * the next refresh without needing a local mirror or forcing the user to log out. The
- * same list backs both the resolved {@link User#roles()} and the Spring Security
- * authorities.
+ * the next refresh without needing a local mirror or forcing the user to log out. Keycloak
+ * always includes its own auto-assigned {@code default-roles-<realm>} in this claim for
+ * every account, regardless of realm configuration - filtered out here via
+ * {@link KeycloakRoleProperties#excludedRealmRoles}, the same list the Admin API adapters
+ * use, so it never reaches {@code /me} or an authorization check. The same filtered list
+ * backs both the resolved {@link User#roles()} and the Spring Security authorities.
  * <p>
  * Permissions (see {@code docs/adr/0007-permissions-as-keycloak-composite-roles.md}) are
  * read the same way from {@code resource_access.onepiece-proxy.roles} - Keycloak expands
@@ -49,6 +55,7 @@ import java.util.stream.Stream;
  * see {@link Permission#allFrom} for where and why they are read back out.
  */
 @Component
+@RequiredArgsConstructor(onConstructor_ = { @Autowired })
 class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
 	private static final String USERNAME_CLAIM = "preferred_username";
@@ -74,12 +81,17 @@ class ApplicationUserJwtAuthenticationConverter implements Converter<Jwt, Abstra
 	 */
 	private static final String ROLE_AUTHORITY_PREFIX = "ROLE_";
 
+	private final KeycloakRoleProperties keycloakRoleProperties;
+
 	@Override
 	public AbstractAuthenticationToken convert(Jwt jwt) {
 		UUID userId = JwtUtils.getRequiredUuidClaim(jwt, JwtClaimNames.SUB);
 		String username = JwtUtils.getRequiredStringClaim(jwt, USERNAME_CLAIM);
 		String email = JwtUtils.getRequiredStringClaim(jwt, EMAIL_CLAIM);
-		var roles = JwtUtils.getNestedStringListClaim(jwt, REALM_ACCESS_CLAIM, ROLES_CLAIM);
+		var roles = JwtUtils.getNestedStringListClaim(jwt, REALM_ACCESS_CLAIM, ROLES_CLAIM)
+			.stream()
+			.filter(role -> !this.keycloakRoleProperties.excludedRealmRoles().contains(role))
+			.toList();
 		var permissions = JwtUtils.getNestedStringListClaim(jwt, RESOURCE_ACCESS_CLAIM, PERMISSIONS_CLIENT_ID,
 				ROLES_CLAIM);
 

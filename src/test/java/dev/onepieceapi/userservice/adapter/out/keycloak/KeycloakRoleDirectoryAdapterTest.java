@@ -8,6 +8,7 @@ import dev.onepieceapi.userservice.application.exception.PermissionNotFoundExcep
 import dev.onepieceapi.userservice.application.exception.RoleAlreadyExistsException;
 import dev.onepieceapi.userservice.application.exception.RoleInUseException;
 import dev.onepieceapi.userservice.application.exception.RoleNotFoundException;
+import dev.onepieceapi.userservice.config.KeycloakRoleProperties;
 import dev.onepieceapi.userservice.domain.PermissionDefinition;
 import jakarta.ws.rs.ClientErrorException;
 import jakarta.ws.rs.NotFoundException;
@@ -74,11 +75,11 @@ class KeycloakRoleDirectoryAdapterTest {
 
 	@BeforeEach
 	void setUp() {
-		Set<String> excludedRealmRoles = Set.of("default-roles-onepiece");
 		String clientSecret = "secret";
 		var adminProperties = new KeycloakAdminProperties("http://keycloak", "onepiece", "user-service-admin",
-				clientSecret, excludedRealmRoles);
-		this.adapter = new KeycloakRoleDirectoryAdapter(this.keycloakAdminClient, adminProperties);
+				clientSecret);
+		var roleProperties = new KeycloakRoleProperties(Set.of("default-roles-onepiece"));
+		this.adapter = new KeycloakRoleDirectoryAdapter(this.keycloakAdminClient, adminProperties, roleProperties);
 
 		lenient().when(this.keycloakAdminClient.realm("onepiece")).thenReturn(this.realmResource);
 		lenient().when(this.realmResource.roles()).thenReturn(this.realmRoles);
