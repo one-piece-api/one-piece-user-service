@@ -40,9 +40,9 @@ import java.util.stream.Stream;
  * Roles are read from the token's own {@code realm_access.roles} claim: Keycloak
  * recomputes that claim on every token issuance, including the silent refresh
  * oauth2-proxy already performs, so a role change (UF-IDU-15) reaches authorization on
- * the next refresh without needing a local mirror or forcing the user to log out. Keycloak
- * always includes its own auto-assigned {@code default-roles-<realm>} in this claim for
- * every account, regardless of realm configuration - filtered out here via
+ * the next refresh without needing a local mirror or forcing the user to log out.
+ * Keycloak always includes its own auto-assigned {@code default-roles-<realm>} in this
+ * claim for every account, regardless of realm configuration - filtered out here via
  * {@link KeycloakRoleProperties#excludedRealmRoles}, the same list the Admin API adapters
  * use, so it never reaches {@code /me} or an authorization check. The same filtered list
  * backs both the resolved {@link User#roles()} and the Spring Security authorities.
