@@ -11,13 +11,14 @@ import dev.onepieceapi.userservice.application.service.UserRoleService;
 import dev.onepieceapi.userservice.domain.AccountStatus;
 import dev.onepieceapi.userservice.domain.User;
 import dev.onepieceapi.userservice.domain.UserFilter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -39,6 +41,7 @@ import java.util.UUID;
  * {@link RoleController}'s concern, not this one's.
  */
 @RestController
+@Tag(name = "Users")
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
 class UserController {
 
@@ -56,8 +59,9 @@ class UserController {
 	 * {@code UserDirectoryPort#findUsers} for how a non-empty filter is resolved.
 	 */
 	@GetMapping(ApiPaths.USERS)
-	PageResponse<UserSummaryResponse> listUsers(Pageable pageable, @RequestParam(required = false) String q,
-			@RequestParam(required = false) String role, @RequestParam(required = false) AccountStatus status) {
+	PageResponse<UserSummaryResponse> listUsers(@ParameterObject Pageable pageable,
+			@RequestParam(required = false) String q, @RequestParam(required = false) String role,
+			@RequestParam(required = false) AccountStatus status) {
 		var filter = new UserFilter(q, role, status);
 		Page<UserSummaryResponse> page = this.userQueryService.list(pageable, filter)
 			.map(UserSummaryResponseMapper::toResponse);
@@ -70,10 +74,10 @@ class UserController {
 	}
 
 	@PostMapping(ApiPaths.USERS)
-	ResponseEntity<UserSummaryResponse> inviteUser(@Valid @RequestBody InviteUserRequest request,
-			@AuthenticationPrincipal User user) {
+	@ResponseStatus(HttpStatus.CREATED)
+	UserSummaryResponse inviteUser(@Valid @RequestBody InviteUserRequest request, @AuthenticationPrincipal User user) {
 		var invited = this.userInvitationService.invite(request.email(), request.roles(), user);
-		return ResponseEntity.status(HttpStatus.CREATED).body(UserSummaryResponseMapper.toResponse(invited));
+		return UserSummaryResponseMapper.toResponse(invited);
 	}
 
 	@PostMapping(ApiPaths.USER_RESEND_INVITATION)

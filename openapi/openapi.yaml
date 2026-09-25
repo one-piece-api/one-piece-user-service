@@ -1,0 +1,762 @@
+openapi: 3.1.0
+info:
+  title: user-service
+  version: v1
+servers:
+- url: /api
+security:
+- keycloak: []
+paths:
+  /audit:
+    get:
+      operationId: listAuditEvents
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - in: query
+        name: userId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: actions
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - USER_INVITED
+            - INVITATION_RESENT
+            - ROLE_ASSIGNED
+            - ROLE_REVOKED
+            - ACCESS_REVOKED
+            - ACCESS_REACTIVATED
+            - ROLE_CREATED
+            - ROLE_DELETED
+            - PERMISSION_CREATED
+            - PERMISSION_ASSIGNED_TO_ROLE
+            - PERMISSION_REVOKED_FROM_ROLE
+            - PERMISSION_DELETED
+          uniqueItems: true
+      - in: query
+        name: actorEmail
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseAuditEventResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Audit
+      x-required-permission: audit:read
+  /audit/actors:
+    get:
+      operationId: listActors
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Audit
+      x-required-permission: audit:read
+  /me:
+    get:
+      operationId: me
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Me
+  /permissions:
+    get:
+      operationId: listPermissions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PermissionResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:manage
+    post:
+      operationId: createPermission
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePermissionRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionResponse"
+          description: Created
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:manage
+  /permissions/{permission}:
+    delete:
+      operationId: deletePermission
+      parameters:
+      - in: path
+        name: permission
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:manage
+  /roles:
+    get:
+      operationId: listRoles
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RolePermissionsResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:read
+    post:
+      operationId: createRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RolePermissionsResponse"
+          description: Created
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:manage
+  /roles/{role}:
+    delete:
+      operationId: deleteRole
+      parameters:
+      - in: path
+        name: role
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:manage
+  /roles/{role}/permissions/{permission}:
+    delete:
+      operationId: revokePermission
+      parameters:
+      - in: path
+        name: role
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: permission
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:manage
+    put:
+      operationId: assignPermission
+      parameters:
+      - in: path
+        name: role
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: permission
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Roles and permissions
+      x-required-permission: roles:manage
+  /users:
+    get:
+      operationId: listUsers
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: role
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - PENDING
+          - INVITATION_EXPIRED
+          - ACTIVE
+          - DISABLED
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseUserSummaryResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: users:read
+    post:
+      operationId: inviteUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteUserRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummaryResponse"
+          description: Created
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: users:invite
+  /users/{userId}:
+    get:
+      operationId: getUser
+      parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummaryResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: users:read
+  /users/{userId}/reactivate:
+    post:
+      operationId: reactivate
+      parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummaryResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: access:write
+  /users/{userId}/resend-invitation:
+    post:
+      operationId: resendInvitation
+      parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummaryResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: users:invite
+  /users/{userId}/revoke-access:
+    post:
+      operationId: revokeAccess
+      parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummaryResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: access:write
+  /users/{userId}/roles/{role}:
+    delete:
+      operationId: revokeRole
+      parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: role
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummaryResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: roles:assign
+    put:
+      operationId: assignRole
+      parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: role
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummaryResponse"
+          description: OK
+        "4XX":
+          $ref: "#/components/responses/ClientError"
+        "5XX":
+          $ref: "#/components/responses/ServerError"
+      tags:
+      - Users
+      x-required-permission: roles:assign
+components:
+  responses:
+    ClientError:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: "Client error - a problem detail, except a 401/403 rejected by\
+        \ the security filter chain before reaching the application, which has no\
+        \ body"
+    ServerError:
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+      description: Unexpected server error
+  schemas:
+    AuditEventResponse:
+      type: object
+      properties:
+        action:
+          type: string
+        actorEmail:
+          type: string
+        actorUserId:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        targetEmail:
+          type: string
+        targetLabel:
+          type: string
+        targetUserId:
+          type: string
+          format: uuid
+    CreatePermissionRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          minLength: 1
+        key:
+          type: string
+          minLength: 1
+          pattern: "^[a-z0-9]+:[a-z0-9]+$"
+      required:
+      - description
+      - key
+    CreateRoleRequest:
+      type: object
+      properties:
+        copyFromRole:
+          type: string
+        name:
+          type: string
+          minLength: 1
+      required:
+      - name
+    FieldViolation:
+      type: object
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+      required:
+      - field
+      - message
+    InviteUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        roles:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          uniqueItems: true
+      required:
+      - email
+      - roles
+    MeResponse:
+      type: object
+      properties:
+        email:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        roles:
+          type: array
+          items:
+            type: string
+        username:
+          type: string
+    PageResponseAuditEventResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEventResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageResponseUserSummaryResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserSummaryResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PermissionResponse:
+      type: object
+      properties:
+        description:
+          type: string
+        key:
+          type: string
+    ProblemDetail:
+      type: object
+      description: "RFC 9457 problem detail, plus this API's own properties"
+      properties:
+        detail:
+          type: string
+        errorCode:
+          type: string
+          description: "Stable, machine-readable error code"
+        errors:
+          type: array
+          description: "Per-field failures, present only when errorCode is VALIDATION_FAILED"
+          items:
+            $ref: "#/components/schemas/FieldViolation"
+        instance:
+          type: string
+          format: uri
+        status:
+          type: integer
+          format: int32
+        timestamp:
+          type: string
+          format: date-time
+        title:
+          type: string
+        traceId:
+          type: string
+        type:
+          type: string
+          format: uri
+      required:
+      - errorCode
+      - status
+      - title
+      - type
+    RolePermissionsResponse:
+      type: object
+      properties:
+        permissions:
+          type: array
+          items:
+            type: string
+        role:
+          type: string
+    UserSummaryResponse:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum:
+          - PENDING
+          - INVITATION_EXPIRED
+          - ACTIVE
+          - DISABLED
+        userId:
+          type: string
+          format: uuid
+        username:
+          type: string
+  securitySchemes:
+    keycloak:
+      flows:
+        authorizationCode:
+          authorizationUrl: http://localhost:8080/realms/onepiece/protocol/openid-connect/auth
+          refreshUrl: http://localhost:8080/realms/onepiece/protocol/openid-connect/token
+          scopes:
+            openid: OpenID Connect sign-in
+          tokenUrl: http://localhost:8080/realms/onepiece/protocol/openid-connect/token
+      type: oauth2

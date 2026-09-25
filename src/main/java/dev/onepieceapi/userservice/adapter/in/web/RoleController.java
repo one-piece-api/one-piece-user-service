@@ -7,11 +7,11 @@ import dev.onepieceapi.userservice.adapter.in.web.dto.RolePermissionsResponse;
 import dev.onepieceapi.userservice.application.service.RoleManagementService;
 import dev.onepieceapi.userservice.application.service.RoleQueryService;
 import dev.onepieceapi.userservice.domain.User;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -31,6 +32,7 @@ import java.util.Map;
  * here - see {@code security.SecuredEndpoint}.
  */
 @RestController
+@Tag(name = "Roles and permissions")
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
 class RoleController {
 
@@ -50,16 +52,17 @@ class RoleController {
 	}
 
 	@PostMapping(ApiPaths.ROLES)
-	ResponseEntity<List<RolePermissionsResponse>> createRole(@Valid @RequestBody CreateRoleRequest request,
+	@ResponseStatus(HttpStatus.CREATED)
+	List<RolePermissionsResponse> createRole(@Valid @RequestBody CreateRoleRequest request,
 			@AuthenticationPrincipal User user) {
 		var updated = this.roleManagementService.createRole(request.name(), request.copyFromRole(), user);
-		return ResponseEntity.status(HttpStatus.CREATED).body(toResponses(updated));
+		return toResponses(updated);
 	}
 
 	@DeleteMapping(ApiPaths.ROLE_BY_NAME)
-	ResponseEntity<Void> deleteRole(@PathVariable String role, @AuthenticationPrincipal User user) {
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void deleteRole(@PathVariable String role, @AuthenticationPrincipal User user) {
 		this.roleManagementService.deleteRole(role, user);
-		return ResponseEntity.noContent().build();
 	}
 
 	/** Every permission that exists, including one no role currently holds. */
@@ -72,31 +75,31 @@ class RoleController {
 	}
 
 	@PostMapping(ApiPaths.PERMISSIONS)
-	ResponseEntity<PermissionResponse> createPermission(@Valid @RequestBody CreatePermissionRequest request,
+	@ResponseStatus(HttpStatus.CREATED)
+	PermissionResponse createPermission(@Valid @RequestBody CreatePermissionRequest request,
 			@AuthenticationPrincipal User user) {
 		var created = this.roleManagementService.createPermission(request.key(), request.description(), user);
-		var response = new PermissionResponse(created.key(), created.description());
-		return ResponseEntity.status(HttpStatus.CREATED).body(response);
+		return new PermissionResponse(created.key(), created.description());
 	}
 
 	@DeleteMapping(ApiPaths.PERMISSION_BY_KEY)
-	ResponseEntity<Void> deletePermission(@PathVariable String permission, @AuthenticationPrincipal User user) {
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void deletePermission(@PathVariable String permission, @AuthenticationPrincipal User user) {
 		this.roleManagementService.deletePermission(permission, user);
-		return ResponseEntity.noContent().build();
 	}
 
 	@PutMapping(ApiPaths.ROLE_PERMISSION)
-	ResponseEntity<Void> assignPermission(@PathVariable String role, @PathVariable String permission,
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void assignPermission(@PathVariable String role, @PathVariable String permission,
 			@AuthenticationPrincipal User user) {
 		this.roleManagementService.assignPermission(role, permission, user);
-		return ResponseEntity.noContent().build();
 	}
 
 	@DeleteMapping(ApiPaths.ROLE_PERMISSION)
-	ResponseEntity<Void> revokePermission(@PathVariable String role, @PathVariable String permission,
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void revokePermission(@PathVariable String role, @PathVariable String permission,
 			@AuthenticationPrincipal User user) {
 		this.roleManagementService.revokePermission(role, permission, user);
-		return ResponseEntity.noContent().build();
 	}
 
 	private static List<RolePermissionsResponse> toResponses(Map<String, List<String>> rolePermissions) {

@@ -6,7 +6,9 @@ import dev.onepieceapi.userservice.adapter.in.web.mapper.AuditEventResponseMappe
 import dev.onepieceapi.userservice.application.service.AuditQueryService;
 import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,15 +29,17 @@ import java.util.UUID;
  * {@code UserDirectoryPort}.
  */
 @RestController
+@Tag(name = "Audit")
 @RequiredArgsConstructor(onConstructor_ = { @Autowired })
 class AuditController {
 
 	private final AuditQueryService auditQueryService;
 
 	@GetMapping(ApiPaths.AUDIT)
-	PageResponse<AuditEventResponse> list(Pageable pageable, @RequestParam(required = false) UUID userId,
-			@RequestParam(required = false) Set<AuditAction> actions, @RequestParam(required = false) String actorEmail,
-			@RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
+	PageResponse<AuditEventResponse> listAuditEvents(@ParameterObject Pageable pageable,
+			@RequestParam(required = false) UUID userId, @RequestParam(required = false) Set<AuditAction> actions,
+			@RequestParam(required = false) String actorEmail, @RequestParam(required = false) LocalDate from,
+			@RequestParam(required = false) LocalDate to) {
 		Page<AuditEvent> page = this.auditQueryService.list(pageable, userId, actions, actorEmail, from, to);
 		return PageResponse.from(page.map(AuditEventResponseMapper::toResponse));
 	}

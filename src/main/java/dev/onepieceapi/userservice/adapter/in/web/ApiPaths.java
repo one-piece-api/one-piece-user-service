@@ -12,6 +12,12 @@ public final class ApiPaths {
 
 	public static final String HEALTH = "/actuator/health/**";
 
+	public static final String API_DOCS = "/v3/api-docs/**";
+
+	public static final String SWAGGER_UI = "/swagger-ui/**";
+
+	public static final String SWAGGER_UI_ENTRY = "/swagger-ui.html";
+
 	public static final String ME = "/me";
 
 	public static final String USERS = "/users";

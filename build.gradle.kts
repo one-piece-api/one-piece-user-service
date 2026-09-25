@@ -33,7 +33,7 @@ repositories {
 }
 
 dependencies {
-	implementation("dev.onepieceapi:one-piece-exception:0.1.0")
+	implementation("dev.onepieceapi:one-piece-exception:0.2.0")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -62,6 +62,11 @@ dependencies {
 	// its Admin REST API surface (user/role listing) is stable across these
 	// nearby server versions.
 	implementation("org.keycloak:keycloak-admin-client:26.0.12")
+	// OpenAPI spec generated from the controllers (code-first), served with Swagger UI
+	// behind login and committed as openapi/openapi.yaml for the Bruno collection - see
+	// docs/adr/0014-openapi-contract-and-bruno-collection.md. Not managed by Spring Boot's
+	// BOM; 3.1.x is the line built against Boot 4.1.
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
 	testCompileOnly("org.projectlombok:lombok")
@@ -101,6 +106,18 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+// Rewrites openapi/openapi.yaml from the current controllers instead of failing on a
+// mismatch - the one command to run after an API change (see OpenApiSpecTest).
+tasks.register<Test>("updateOpenApiSpec") {
+	description = "Regenerates openapi/openapi.yaml from the current controllers."
+	group = "documentation"
+	testClassesDirs = sourceSets.test.get().output.classesDirs
+	classpath = sourceSets.test.get().runtimeClasspath
+	filter { includeTestsMatching("*OpenApiSpecTest") }
+	systemProperty("openapi.update", "true")
+	outputs.upToDateWhen { false }
 }
 
 checkstyle {

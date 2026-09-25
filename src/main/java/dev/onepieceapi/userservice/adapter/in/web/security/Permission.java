@@ -46,6 +46,11 @@ public enum Permission {
 
 	private final String value;
 
+	/** The bare permission string, as carried on the JWT and shown to API consumers. */
+	public String value() {
+		return this.value;
+	}
+
 	public String authority() {
 		return AUTHORITY_PREFIX + this.value;
 	}

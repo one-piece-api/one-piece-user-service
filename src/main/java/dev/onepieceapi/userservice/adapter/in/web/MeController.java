@@ -3,12 +3,14 @@ package dev.onepieceapi.userservice.adapter.in.web;
 import dev.onepieceapi.userservice.adapter.in.web.dto.MeResponse;
 import dev.onepieceapi.userservice.adapter.in.web.security.Permission;
 import dev.onepieceapi.userservice.domain.User;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Tag(name = "Me")
 class MeController {
 
 	@GetMapping(ApiPaths.ME)
