@@ -32,8 +32,9 @@ sync on its own, usable against both the local and the remote environment.
   request folders from the spec (`bru import openapi`, CLI version pinned).
   `opencollection.yml` (auth) and `environments/` are written by hand and never
   regenerated. Auth is authorization code + PKCE with the public `bruno` Keycloak client.
-  Environments are `local` (via oauth2-proxy, `localhost:4180`) and `remote` (host from
-  the git-ignored `bruno/.env`). Bearer tokens pass through oauth2-proxy thanks to
+  Environments are `dev` (the service run from IntelliJ, `localhost:8081`, no proxy),
+  `local` (kind cluster via oauth2-proxy, `localhost:4180`) and `remote` (host from the
+  git-ignored `bruno/.env`). Bearer tokens pass through oauth2-proxy thanks to
   `skip-jwt-bearer-tokens` (onepiece-infrastructure ADR-0017).
 - **CI** (`api-contract` job): fails if `bruno/` is stale, and on a PR reports breaking
   changes against main's spec (oasdiff) as annotations, without failing.

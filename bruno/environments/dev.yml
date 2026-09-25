@@ -1,0 +1,9 @@
+name: dev
+variables:
+  # Straight to the service running from IntelliJ (Spring profile "local"), no
+  # oauth2-proxy in between; Keycloak still via its port-forward on 8080 - see
+  # README.md, "Sviluppo locale".
+  - name: baseUrl
+    value: http://localhost:8081/api
+  - name: keycloakRealmUrl
+    value: http://localhost:8080/realms/onepiece
