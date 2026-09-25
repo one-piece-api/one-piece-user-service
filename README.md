@@ -10,7 +10,16 @@ degli account via Keycloak Admin API, e il catalogo ruoli/permessi.
 
 ## Sviluppo locale
 
-Prerequisito: il cluster `kind` locale attivo (`./scripts/setup.sh` nel repo
+Prerequisito: credenziali per GitHub Packages (da cui arriva `one-piece-exception`), cioè un
+[personal access token classic](https://github.com/settings/tokens) con il solo scope
+`read:packages`, in `~/.gradle/gradle.properties`:
+
+```properties
+gpr.user=<utente GitHub>
+gpr.token=<token>
+```
+
+Poi il cluster `kind` locale attivo (`./scripts/setup.sh` nel repo
 `onepiece-infrastructure`) e questi due port-forward, in due terminali separati:
 
 ```bash

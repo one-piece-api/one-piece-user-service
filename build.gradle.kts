@@ -25,9 +25,12 @@ repositories {
 	maven {
 		name = "GitHubPackages"
 		url = uri("https://maven.pkg.github.com/one-piece-api/one-piece-exception")
+		// gpr.user/gpr.token in ~/.gradle/gradle.properties for local dev (a PAT classic with
+		// read:packages only), GITHUB_ACTOR/GITHUB_TOKEN in CI - a global GITHUB_TOKEN env var
+		// would also take over the gh CLI's own login.
 		credentials {
-			username = System.getenv("GITHUB_ACTOR")
-			password = System.getenv("GITHUB_TOKEN")
+			username = providers.gradleProperty("gpr.user").orElse(providers.environmentVariable("GITHUB_ACTOR")).orNull
+			password = providers.gradleProperty("gpr.token").orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
 		}
 	}
 }
