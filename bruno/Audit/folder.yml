@@ -1,0 +1,6 @@
+info:
+  name: Audit
+  type: folder
+
+request:
+  auth: inherit

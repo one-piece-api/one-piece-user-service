@@ -1,0 +1,114 @@
+info:
+  name: resendInvitation
+  type: http
+  seq: 5
+  tags:
+    - Users
+
+http:
+  method: POST
+  url: "{{baseUrl}}/users/:userId/resend-invitation"
+  params:
+    - name: userId
+      value: ""
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+examples:
+  - name: 200 Response
+    description: OK
+    request:
+      url: "{{baseUrl}}/users/:userId/resend-invitation"
+      method: POST
+      params:
+        - name: userId
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "createdAt": "",
+            "email": "",
+            "roles": [],
+            "status": "PENDING",
+            "userId": "",
+            "username": ""
+          }
+  - name: 4XX Response
+    description: Client error - a problem detail, except a 401/403 rejected by the security filter chain before reaching the application, which has no body
+    request:
+      url: "{{baseUrl}}/users/:userId/resend-invitation"
+      method: POST
+      params:
+        - name: userId
+          value: ""
+          type: path
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "",
+            "errorCode": "",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ],
+            "instance": "",
+            "status": 0,
+            "timestamp": "",
+            "title": "",
+            "traceId": "",
+            "type": ""
+          }
+  - name: 5XX Response
+    description: Unexpected server error
+    request:
+      url: "{{baseUrl}}/users/:userId/resend-invitation"
+      method: POST
+      params:
+        - name: userId
+          value: ""
+          type: path
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "",
+            "errorCode": "",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ],
+            "instance": "",
+            "status": 0,
+            "timestamp": "",
+            "title": "",
+            "traceId": "",
+            "type": ""
+          }

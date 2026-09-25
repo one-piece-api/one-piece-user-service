@@ -1,0 +1,8 @@
+name: local
+variables:
+  # Through oauth2-proxy, exactly like the browser (kind cluster, see
+  # onepiece-infrastructure/README.md).
+  - name: baseUrl
+    value: http://localhost:4180/api
+  - name: keycloakRealmUrl
+    value: http://localhost:8080/realms/onepiece

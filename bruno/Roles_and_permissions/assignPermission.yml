@@ -1,0 +1,115 @@
+info:
+  name: assignPermission
+  type: http
+  seq: 8
+  tags:
+    - Roles_and_permissions
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/roles/:role/permissions/:permission"
+  params:
+    - name: role
+      value: ""
+      type: path
+    - name: permission
+      value: ""
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+examples:
+  - name: 204 Response
+    description: No Content
+    request:
+      url: "{{baseUrl}}/roles/:role/permissions/:permission"
+      method: PUT
+      params:
+        - name: role
+          value: ""
+          type: path
+        - name: permission
+          value: ""
+          type: path
+    response:
+      status: 204
+      statusText: No Content
+      body:
+        type: text
+        data: ""
+  - name: 4XX Response
+    description: Client error - a problem detail, except a 401/403 rejected by the security filter chain before reaching the application, which has no body
+    request:
+      url: "{{baseUrl}}/roles/:role/permissions/:permission"
+      method: PUT
+      params:
+        - name: role
+          value: ""
+          type: path
+        - name: permission
+          value: ""
+          type: path
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "",
+            "errorCode": "",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ],
+            "instance": "",
+            "status": 0,
+            "timestamp": "",
+            "title": "",
+            "traceId": "",
+            "type": ""
+          }
+  - name: 5XX Response
+    description: Unexpected server error
+    request:
+      url: "{{baseUrl}}/roles/:role/permissions/:permission"
+      method: PUT
+      params:
+        - name: role
+          value: ""
+          type: path
+        - name: permission
+          value: ""
+          type: path
+    response:
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": "",
+            "errorCode": "",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ],
+            "instance": "",
+            "status": 0,
+            "timestamp": "",
+            "title": "",
+            "traceId": "",
+            "type": ""
+          }

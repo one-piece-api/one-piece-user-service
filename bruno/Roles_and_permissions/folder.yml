@@ -1,0 +1,6 @@
+info:
+  name: Roles_and_permissions
+  type: folder
+
+request:
+  auth: inherit

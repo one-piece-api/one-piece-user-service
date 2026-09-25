@@ -1,0 +1,37 @@
+opencollection: 1.0.0
+
+info:
+  name: user-service
+
+# Written by hand, never regenerated (scripts/generate-bruno-collection.sh only
+# replaces the request folders). Every request inherits this auth: authorization
+# code + PKCE against Keycloak with the public "bruno" client (no secret), see
+# onepiece-infrastructure/keycloak/realm-onepiece.json. Bruno intercepts the
+# redirect itself, so callbackUrl only has to match the client's registered
+# redirect URI - nothing ever listens on it.
+request:
+  auth:
+    type: oauth2
+    flow: authorization_code
+    authorizationUrl: "{{keycloakRealmUrl}}/protocol/openid-connect/auth"
+    accessTokenUrl: "{{keycloakRealmUrl}}/protocol/openid-connect/token"
+    refreshTokenUrl: "{{keycloakRealmUrl}}/protocol/openid-connect/token"
+    callbackUrl: http://127.0.0.1/bruno/callback
+    credentials:
+      clientId: bruno
+      placement: body
+    scope: openid
+    pkce: {}
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: true
+      autoRefreshToken: true
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

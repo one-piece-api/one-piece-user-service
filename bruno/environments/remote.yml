@@ -1,0 +1,8 @@
+name: remote
+variables:
+  # REMOTE_HOST (the environment's public IP) comes from bruno/.env, not
+  # committed - copy bruno/.env.example and fill it in.
+  - name: baseUrl
+    value: http://{{process.env.REMOTE_HOST}}/api
+  - name: keycloakRealmUrl
+    value: http://{{process.env.REMOTE_HOST}}/realms/onepiece
