@@ -61,10 +61,55 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew test --no-daemon
 
+  # openapi/openapi.yaml itself is kept in sync by OpenApiSpecTest (test job). This job
+  # covers what's derived from it: the Bruno collection, and - on a PR - a report of any
+  # breaking change against main's spec. See docs/adr/0014-openapi-contract-and-bruno-collection.md.
+  api-contract:
+    name: API contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Check the Bruno collection matches the spec
+        run: |
+          ./scripts/generate-bruno-collection.sh
+          if [ -n "$(git status --porcelain bruno)" ]; then
+            git status --porcelain bruno
+            echo "::error::bruno/ is stale - run scripts/generate-bruno-collection.sh and commit the result"
+            exit 1
+          fi
+
+      # Reported as PR annotations, not a failure: the frontend (the only consumer) may be
+      # changed on purpose in step with the API - the point is that nobody misses it.
+      # Inside the workspace: the oasdiff action runs in a container that only mounts it.
+      - name: Extract main's spec
+        id: base-spec
+        if: github.event_name == 'pull_request'
+        run: |
+          if git show "origin/${{ github.base_ref }}:openapi/openapi.yaml" > base-openapi.yaml 2>/dev/null; then
+            echo "path=base-openapi.yaml" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report breaking changes
+        if: steps.base-spec.outputs.path != ''
+        uses: oasdiff/oasdiff-action/breaking@v0.1.17
+        with:
+          base: ${{ steps.base-spec.outputs.path }}
+          revision: openapi/openapi.yaml
+          review: false
+
   build-jar:
     name: Build jar
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint, test, api-contract]
     if: github.event_name == 'push'
     outputs:
       version: ${{ steps.version.outputs.version }}
