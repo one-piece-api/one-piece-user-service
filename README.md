@@ -4,7 +4,7 @@ Backend applicativo (Spring Boot) per l'identità e la gestione utenti di One Pi
 risolve l'identità del chiamante dal JWT (`/api/me`), gestisce l'invito e il ciclo di vita
 degli account via Keycloak Admin API, e il catalogo ruoli/permessi.
 
-- **Flussi/regole di prodotto:** `docs/user-flows/authentication-and-user-management.md` (repo `one-piece-api`).
+- **Flussi/regole di prodotto:** `docs/user-flows/content-editorial-workflow.md` (repo `one-piece-api`).
 - **Stack:** vedi `docs/technology-stack.md` (repo `one-piece-api`).
 - **Decisioni architetturali di questo servizio:** `docs/adr/`.
 
