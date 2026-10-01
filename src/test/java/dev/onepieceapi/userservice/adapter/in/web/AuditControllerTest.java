@@ -10,6 +10,8 @@ import dev.onepieceapi.userservice.domain.AuditAction;
 import dev.onepieceapi.userservice.domain.AuditEvent;
 import dev.onepieceapi.userservice.domain.User;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -30,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -69,6 +72,17 @@ class AuditControllerTest {
 	void aCallerWithNoRelevantAuthorityIsForbidden() throws Exception {
 		var request = get("/audit").with(asUserWithAuthorities("PERMISSION_docs:read"));
 		this.mockMvc.perform(request).andExpect(status().isForbidden());
+	}
+
+	@ParameterizedTest
+	@CsvSource({ "userId, not-a-uuid", "actions, NOT_AN_ACTION", "from, yesterday" })
+	void aFilterOfTheWrongTypeIsABadRequestNamingIt(String filter, String value) throws Exception {
+		var request = get("/audit").param(filter, value).with(asUserWithAuthorities("PERMISSION_audit:read"));
+		this.mockMvc.perform(request)
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+			.andExpect(jsonPath("$.errors[0].field").value(filter))
+			.andExpect(jsonPath("$.errors[0].message").value("invalid value"));
 	}
 
 	@Test
