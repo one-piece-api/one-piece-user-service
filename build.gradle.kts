@@ -36,7 +36,7 @@ repositories {
 }
 
 dependencies {
-	implementation("dev.onepieceapi:one-piece-exception:0.3.1")
+	implementation("dev.onepieceapi:one-piece-exception:0.5.0")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
