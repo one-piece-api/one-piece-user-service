@@ -1,8 +1,8 @@
 name: remote
 variables:
-  # REMOTE_HOST (the environment's public IP) comes from bruno/.env, not
-  # committed - copy bruno/.env.example and fill it in.
+  # The deployed dev environment behind Cloudflare (onepiece-infrastructure/README.md):
+  # app. and auth. answer only to the owner's IP.
   - name: baseUrl
-    value: http://{{process.env.REMOTE_HOST}}/api
+    value: https://app.onepieceapi.dev/api
   - name: keycloakRealmUrl
-    value: http://{{process.env.REMOTE_HOST}}/realms/onepiece
+    value: https://auth.onepieceapi.dev/realms/onepiece

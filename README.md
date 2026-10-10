@@ -60,9 +60,8 @@ risponde su `http://localhost:8081/api/...`
   ```
 
 - Bruno: "Open Collection" su `bruno/`, environment `dev` (servizio avviato da IntelliJ,
-  `localhost:8081`, senza proxy), `local` (cluster `kind` via oauth2-proxy) o `remote` (per `remote` copia
-  `bruno/.env.example` in `bruno/.env` e imposta `REMOTE_HOST`). Il primo invio apre il
-  login Keycloak (client `bruno`, PKCE).
+  `localhost:8081`, senza proxy), `local` (cluster `kind` via oauth2-proxy) o `remote` (`app.onepieceapi.dev`, solo dall'IP del proprietario).
+  Il primo invio apre il login Keycloak (client `bruno`, PKCE).
 
 **Verifica nel cluster `kind`** (build immagine reale, non solo il processo
 locale): `scripts/deploy-local.sh` (build immagine + `kind load` + rollout
