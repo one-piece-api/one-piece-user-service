@@ -29,13 +29,21 @@ require_cmd() {
 require_cmd kind "installa kind: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
 require_cmd kubectl "installa kubectl: https://kubernetes.io/docs/tasks/tools/"
 
+# Sempre e solo il cluster kind locale, mai il contesto kubectl corrente (puo' essere il remoto).
+KUBE_CONTEXT="kind-${CLUSTER_NAME}"
+if ! kubectl config get-contexts -o name | grep -qx "$KUBE_CONTEXT"; then
+  previous_context="$(kubectl config current-context 2>/dev/null || true)"
+  kind export kubeconfig --name "$CLUSTER_NAME" >/dev/null
+  [ -z "$previous_context" ] || kubectl config use-context "$previous_context" >/dev/null
+fi
+
 "$REPO_ROOT/scripts/build-image.sh"
 
 log "carico ${IMAGE_NAME}:${IMAGE_TAG} nel cluster kind '${CLUSTER_NAME}'..."
 kind load docker-image "${IMAGE_NAME}:${IMAGE_TAG}" --name "$CLUSTER_NAME"
 
 log "riavvio il deployment ${IMAGE_NAME} nel namespace ${NAMESPACE}..."
-kubectl rollout restart "deployment/${IMAGE_NAME}" -n "$NAMESPACE"
-kubectl rollout status "deployment/${IMAGE_NAME}" -n "$NAMESPACE"
+kubectl --context "$KUBE_CONTEXT" rollout restart "deployment/${IMAGE_NAME}" -n "$NAMESPACE"
+kubectl --context "$KUBE_CONTEXT" rollout status "deployment/${IMAGE_NAME}" -n "$NAMESPACE"
 
 log "fatto: ${IMAGE_NAME}:${IMAGE_TAG} è in esecuzione nel cluster."
